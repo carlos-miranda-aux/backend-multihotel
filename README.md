@@ -76,3 +76,7 @@ El backend se levantará en:
 - `npm run dev` → Inicia el servidor en desarrollo
 
 ---
+
+## Notas
+
+Investigar como usar ExcelJS y como integrarlo, dice que en disposal.service, disposal.controller y disposal.routes
