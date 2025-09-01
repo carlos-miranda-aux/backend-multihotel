@@ -15,6 +15,7 @@ En VS Code:
     - Thunder Client: para hacer pruebas de CRUD con el api rest
     - Snipets para js y react
     - Material Icon
+    - ExcelJS
 
 ## ⚙️ Instalación y configuración
 
