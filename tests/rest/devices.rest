@@ -1,0 +1,41 @@
+### Crear dispositivo
+POST http://localhost:3000/api/devices/post
+Content-Type: application/json
+
+{
+  
+  "etiqueta": "EQ-004588",
+  "nombre_equipo": "Laptop Lenovo",
+  "numero_serie": "SN56789KP0",
+  "usuarioId": 4,
+  "tipoId": 1,
+  "estadoId": 2,
+  "sistemaOperativoId": 2,
+  "marca": "Lenovo",
+  "modelo": "ThinkPad X1 Carbon"
+
+}
+
+###
+
+### Listar dispositivos
+GET http://localhost:3000/api/devices/get
+
+###
+
+### Obtener dispositivo por ID
+GET http://localhost:3000/api/devices/get/1
+
+###
+
+### Actualizar dispositivo
+PUT http://localhost:3000/api/devices/put/1
+Content-Type: application/json
+
+{
+  "estadoId": 1
+}
+
+###
+### Eliminar dispositivo
+DELETE http://localhost:3000/api/devices/delete/5

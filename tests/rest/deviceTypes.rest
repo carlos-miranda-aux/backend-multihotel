@@ -1,0 +1,32 @@
+### Crear tipo de dispositivo
+POST http://localhost:3000/api/device-types/post
+Content-Type: application/json
+
+{
+  "nombre": "Impresora"
+}
+
+###
+
+### Listar tipos de dispositivos
+GET http://localhost:3000/api/device-types/get
+
+###
+
+### Obtener tipo por ID
+GET http://localhost:3000/api/device-types/get/1
+
+###
+
+### Actualizar tipo
+PUT http://localhost:3000/api/device-types/put/1
+Content-Type: application/json
+
+{
+  "nombre": "Laptop"
+}
+
+###
+
+### Eliminar tipo
+DELETE http://localhost:3000/api/device-types/delete/1

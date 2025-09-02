@@ -1,3 +1,4 @@
+// services/device.service.js
 import prisma from "../../src/PrismaClient.js";
 
 export const getDevices = () =>
@@ -32,4 +33,21 @@ export const updateDevice = (id, data) =>
 export const deleteDevice = (id) =>
   prisma.device.delete({
     where: { id: Number(id) },
+  });
+
+/* 🔹 Nuevo: obtener solo dispositivos inactivos/bajas */
+export const getInactiveDevices = () =>
+  prisma.device.findMany({
+    where: {
+      estado: {
+        nombre: "Inactivo", // 👈 asegúrate que así se llama en tu tabla DeviceStatus
+      },
+    },
+    include: {
+      usuario: true,
+      tipo: true,
+      estado: true,
+      sistema_operativo: true,
+      disposals: true, // 👈 traemos la info de bajas también
+    },
   });

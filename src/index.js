@@ -9,7 +9,7 @@ import osRoutes from "./routes/operatingSystem.routes.js";
 import deviceTypeRoutes from "./routes/deviceType.routes.js";
 import deviceStatusRoutes from "./routes/deviceStatus.routes.js";
 import userRoutes from "./routes/user.routes.js";
-import deviceRoutes from "./routes/device.routes.js";
+import devicesRoutes from "./routes/devices.routes.js";
 import maintenanceRoutes from "./routes/maintenance.routes.js";
 import disposalRoutes from "./routes/disposal.routes.js";
 
@@ -25,7 +25,7 @@ app.use("/api/operating-systems", osRoutes);
 app.use("/api/device-types", deviceTypeRoutes);
 app.use("/api/device-status", deviceStatusRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/devices", deviceRoutes);
+app.use("/api/devices", devicesRoutes);
 app.use("/api/maintenances", maintenanceRoutes);
 app.use("/api/disposals", disposalRoutes);
 

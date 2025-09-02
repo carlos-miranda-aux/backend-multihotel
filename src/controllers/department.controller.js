@@ -2,7 +2,7 @@ import * as departmentService from '../services/department.service.js';
 
 export const getDepartments = async (req, res) => {
   try {
-    const departments = await departmentService.getAllDepartments();
+    const departments = await departmentService.getDepartments();
     res.json(departments);
   } catch (error) {
     res.status(500).json({ error: error.message });
