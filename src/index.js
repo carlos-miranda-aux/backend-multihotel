@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import prisma from "./PrismaClient.js";
 
+
 // Importar rutas
 import departmentRoutes from "./routes/department.routes.js";
 import osRoutes from "./routes/operatingSystem.routes.js";
@@ -12,6 +13,7 @@ import userRoutes from "./routes/user.routes.js";
 import devicesRoutes from "./routes/devices.routes.js";
 import maintenanceRoutes from "./routes/maintenance.routes.js";
 import disposalRoutes from "./routes/disposal.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 
 dotenv.config();
 
@@ -28,6 +30,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/devices", devicesRoutes);
 app.use("/api/maintenances", maintenanceRoutes);
 app.use("/api/disposals", disposalRoutes);
+app.use("/api/auth", authRoutes);
 
 const PORT = process.env.PORT || 3000;
 

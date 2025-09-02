@@ -1,4 +1,4 @@
-### Crear baja
+### 🚀 Crear baja
 POST http://localhost:3000/api/disposals/post
 Content-Type: application/json
 
@@ -6,34 +6,37 @@ Content-Type: application/json
   "motivo": "Equipo obsoleto",
   "observaciones": "Ya no enciende",
   "fecha_baja": "2025-09-01T09:00:00Z",
-  "deviceId": 6
+  "deviceId": 8
 }
 
 ###
 
-### Listar bajas
+### 📋 Listar todas las bajas
 GET http://localhost:3000/api/disposals/get
 
 ###
 
-### Obtener baja por ID
+### 🔎 Obtener baja por ID
 GET http://localhost:3000/api/disposals/get/1
 
 ###
 
-### Actualizar baja
+### ✏️ Actualizar baja
 PUT http://localhost:3000/api/disposals/put/1
 Content-Type: application/json
 
 {
-  "observaciones": "Se envió a reciclaje"
+  "motivo": "Donación",
+  "observaciones": "Equipo donado a otra área",
+  "fecha_baja": "2025-09-02T12:00:00Z"
 }
 
 ###
 
-### Eliminar baja
+### 🗑️ Eliminar baja
 DELETE http://localhost:3000/api/disposals/delete/2
 
+###
 
-### Exportar bajas a Excel
-GET http://localhost:3000/api/disposals/export/excel
+### 📤 Exportar bajas a Excel
+GET http://localhost:3000/api/disposals

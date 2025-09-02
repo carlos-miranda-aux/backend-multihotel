@@ -111,3 +111,20 @@ model Disposal {
   device        Device   @relation(fields: [deviceId], references: [id])
   deviceId      Int
 }
+
+enum Rol {
+  ADMIN
+  USER
+  EDITOR
+}
+
+model userSistema {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  email     String   @unique
+  nombre    String?
+  rol       Rol      @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
