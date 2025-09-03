@@ -10,10 +10,10 @@ import {
 
 const router = Router();
 
-router.get("/get", getOperatingSystemsController);
-router.get("/getAll/:id", getOperatingSystemController);
-router.post("/post", createOperatingSystemController);
-router.put("/put/:id", updateOperatingSystemController);
-router.delete("/delete/:id", deleteOperatingSystemController);
+router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getOperatingSystemsController);
+router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getOperatingSystemController);
+router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createOperatingSystemController);
+router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]), updateOperatingSystemController);
+router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteOperatingSystemController);
 
 export default router;

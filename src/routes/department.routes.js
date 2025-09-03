@@ -10,11 +10,11 @@ import {
 const router = Router();
 
 // Usando tus rutas personalizadas
-router.get("/get", getDepartments);
-router.get("/get/:id", getDepartment);
-router.post("/post", createDepartment);
-router.put("/put/:id", updateDepartment);
-router.delete("/delete/:id", deleteDepartment);
+router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDepartments);
+router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDepartment);
+router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createDepartment);
+router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]), updateDepartment);
+router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteDepartment);
 
 export default router;
 

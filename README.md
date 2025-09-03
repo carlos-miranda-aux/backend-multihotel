@@ -21,7 +21,7 @@ Instala lo siguiente en tu máquina:
 
 ## ⚙️ Instalación y configuración
 
-1. Clona el proyecto:
+Clona el proyecto:
 
 ```bash
 git clone <URL_DEL_REPO>
@@ -74,11 +74,11 @@ Al hacer login, se genera un token que debe enviarse en cada petición protegida
 http
 Authorization: Bearer <tu_token_aqui>
 Roles disponibles:
-ADMIN → Acceso completo: gestionar usuarios, actualizar y eliminar.
+- ADMIN → Acceso completo: gestionar usuarios, actualizar y eliminar.
 
-EDITOR → Puede modificar algunos recursos (ej. actualizar contraseñas).
+- EDITOR → Puede modificar algunos recursos (ej. actualizar contraseñas).
 
-USER → Acceso básico, uso del sistema sin privilegios administrativos.
+- USER → Acceso básico, uso del sistema sin privilegios administrativos.
 
 Ejemplo de protección de rutas:
 
@@ -88,21 +88,21 @@ router.get("/users", verifyToken, verifyRole(["ADMIN"]), getUsers);
 ## 📚 Librerías utilizadas
 Estas son las principales librerías y frameworks usados en el backend de SIMELAN:
 
-Core
-    - express → Framework para crear el servidor y las rutas HTTP.
-    - cors → Permite habilitar peticiones desde otros dominios (CORS).
-    - dotenv → Manejo de variables de entorno (.env).
+**Core**
+- express → Framework para crear el servidor y las rutas HTTP.
+- cors → Permite habilitar peticiones desde otros dominios (CORS).
+- dotenv → Manejo de variables de entorno (.env).
 
-Base de datos
-    - @prisma/client → Cliente de Prisma para interactuar con la base de datos.-  - prisma → ORM para modelar y manejar migraciones de la DB.
-    - mysql2 → Conector de Node.js para MySQL (usado por Prisma).
+**Base de datos**
+- @prisma/client → Cliente de Prisma para interactuar con la base de datos.-  - prisma → ORM para modelar y manejar migraciones de la DB.
+- mysql2 → Conector de Node.js para MySQL (usado por Prisma).
 
-Autenticación y seguridad
-    - jsonwebtoken (jwt) → Generación y validación de tokens JWT.
-    - bcryptjs → Encriptación de contraseñas.
+**Autenticación y seguridad**
+- jsonwebtoken (jwt) → Generación y validación de tokens JWT.
+- bcryptjs → Encriptación de contraseñas.
 
-Desarrollo
-    - nodemon → Reinicia el servidor automáticamente en desarrollo.
+**Desarrollo**
+- nodemon → Reinicia el servidor automáticamente en desarrollo.
 
 ## 📦 Comandos rápidos
 ```bash

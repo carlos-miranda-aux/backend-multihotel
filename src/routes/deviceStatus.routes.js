@@ -9,10 +9,10 @@ import {
 
 const router = Router();
 
-router.get("/get", getDeviceStatuses);
-router.get("/get/:id", getDeviceStatus);
-router.post("/post", createDeviceStatus);
-router.put("/put/:id", updateDeviceStatus);
-router.delete("/delete/:id", deleteDeviceStatus);
+router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDeviceStatuses);
+router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDeviceStatus);
+router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createDeviceStatus);
+router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]), updateDeviceStatus);
+router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteDeviceStatus);
 
 export default router;
