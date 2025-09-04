@@ -1,4 +1,3 @@
-// src/controllers/operatingSystem.controller.js
 import {
   getOperatingSystems,
   getOperatingSystemById,
@@ -6,63 +5,79 @@ import {
   updateOperatingSystem,
   deleteOperatingSystem
 } from "../services/operatingSystem.service.js";
+import { logAction } from "../services/audit.service.js";
 
-// Obtener todos
+// 📌 Obtener todos los sistemas operativos
 export const getOperatingSystemsController = async (req, res) => {
   try {
     const systems = await getOperatingSystems();
     res.json(systems);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener sistemas operativos" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Obtener por id
+// 📌 Obtener un sistema operativo por ID
 export const getOperatingSystemController = async (req, res) => {
   try {
     const { id } = req.params;
     const system = await getOperatingSystemById(id);
 
-    if (!system) {
-      return res.status(404).json({ error: "Sistema operativo no encontrado" });
-    }
+    if (!system) return res.status(404).json({ message: "OperatingSystem not found" });
 
     res.json(system);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener sistema operativo" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Crear
+// 📌 Crear un nuevo sistema operativo
 export const createOperatingSystemController = async (req, res) => {
+  const userId = req.user.id;
   try {
-    const { nombre } = req.body;
-    const newSystem = await createOperatingSystem({ nombre });
+    const newSystem = await createOperatingSystem(req.body);
+
+    // AUDITORÍA
+    await logAction(userId, "CREATE", "OperatingSystem", newSystem.id, null, newSystem);
+
     res.status(201).json(newSystem);
   } catch (error) {
-    res.status(500).json({ error: "Error al crear sistema operativo" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Actualizar
+// 📌 Actualizar un sistema operativo
 export const updateOperatingSystemController = async (req, res) => {
+  const userId = req.user.id;
   try {
-    const { id } = req.params;
-    const { nombre } = req.body;
-    const updatedSystem = await updateOperatingSystem(id, { nombre });
+    const oldSystem = await getOperatingSystemById(req.params.id);
+    if (!oldSystem) return res.status(404).json({ message: "OperatingSystem not found" });
+
+    const updatedSystem = await updateOperatingSystem(req.params.id, req.body);
+
+    // AUDITORÍA
+    await logAction(userId, "UPDATE", "OperatingSystem", req.params.id, oldSystem, updatedSystem);
+
     res.json(updatedSystem);
   } catch (error) {
-    res.status(500).json({ error: "Error al actualizar sistema operativo" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Eliminar
+// 📌 Eliminar un sistema operativo
 export const deleteOperatingSystemController = async (req, res) => {
+  const userId = req.user.id;
   try {
-    const { id } = req.params;
-    await deleteOperatingSystem(id);
-    res.json({ message: "Sistema operativo eliminado correctamente" });
+    const oldSystem = await getOperatingSystemById(req.params.id);
+    if (!oldSystem) return res.status(404).json({ message: "OperatingSystem not found" });
+
+    await deleteOperatingSystem(req.params.id);
+
+    // AUDITORÍA
+    await logAction(userId, "DELETE", "OperatingSystem", req.params.id, oldSystem, null);
+
+    res.json({ message: "OperatingSystem deleted" });
   } catch (error) {
-    res.status(500).json({ error: "Error al eliminar sistema operativo" });
+    res.status(500).json({ error: error.message });
   }
 };

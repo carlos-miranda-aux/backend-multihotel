@@ -14,6 +14,7 @@ import devicesRoutes from "./routes/devices.routes.js";
 import maintenanceRoutes from "./routes/maintenance.routes.js";
 import disposalRoutes from "./routes/disposal.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import auditRoutes from "./routes/audit.routes.js"
 
 dotenv.config();
 
@@ -31,6 +32,8 @@ app.use("/api/devices", devicesRoutes);
 app.use("/api/maintenances", maintenanceRoutes);
 app.use("/api/disposals", disposalRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/audit",auditRoutes)
+
 
 const PORT = process.env.PORT || 3000;
 
