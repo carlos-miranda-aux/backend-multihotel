@@ -13,8 +13,8 @@ export const registerUser = async (data) => {
       username: data.username,
       password: hashedPassword,
       nombre: data.nombre,
-      rol: data.rol || "user",
-      email: data.email || null,
+      rol: data.rol || "USER",
+      email: data.email,
     },
   });
 };
@@ -22,7 +22,10 @@ export const registerUser = async (data) => {
 // 🔹 Login
 export const loginUser = async ({ username, password }) => {
   const user = await prisma.userSistema.findUnique({
-    where: { username },
+    where: { OR: [
+        { username: identifier },
+        { email: identifier },
+      ], },
   });
 
   if (!user) throw new Error("Usuario no encontrado");
