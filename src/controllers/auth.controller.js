@@ -1,6 +1,7 @@
 import * as authService from "../services/auth.service.js";
+import prisma from "../PrismaClient.js";
 
-export const register = async (req, res) => {
+export const createUser = async (req, res) => {
   try {
     const user = await authService.registerUser(req.body);
     res.status(201).json(user);
@@ -32,6 +33,18 @@ export const getUsers = async (req, res) => {
 // 🔹 Eliminar usuario
 export const deleteUser = async (req, res) => {
   try {
+    const userToDelete = await prisma.userSistema.findUnique({
+      where: { id: Number(req.params.id) },
+    });
+
+    if (!userToDelete) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    if (userToDelete.username === "superadmin") {
+      return res.status(403).json({ error: "No se puede eliminar al superadministrador" });
+    }
+
     await authService.deleteUser(req.params.id);
     res.json({ message: "Usuario eliminado correctamente" });
   } catch (error) {
@@ -39,12 +52,26 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// 🔹 Actualizar contraseña
-export const updatePassword = async (req, res) => {
+// 📌 Actualizar usuario (nombre, email, rol y/o contraseña)
+export const updateUserController = async (req, res) => {
   try {
-    const { password } = req.body;
-    const user = await authService.updatePassword(req.params.id, password);
-    res.json({ message: "Contraseña actualizada correctamente", user });
+    const userId = req.params.id;
+
+    const oldUser = await prisma.userSistema.findUnique({
+      where: { id: Number(userId) },
+    });
+
+    if (!oldUser) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const updatedUser = await authService.updateUser(userId, req.body);
+
+    // AUDITORÍA
+    // Nota: Necesitas pasar el 'req' al middleware de auditoría
+    // await logAction(req.user.id, "UPDATE", "userSistema", userId, oldUser, updatedUser);
+
+    res.json({ message: "Usuario actualizado correctamente", user: updatedUser });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

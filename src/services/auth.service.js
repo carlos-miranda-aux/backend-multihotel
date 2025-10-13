@@ -76,22 +76,29 @@ export const deleteUser = (id) => {
   });
 };
 
-// 🔹 Actualizar contraseña
-export const updatePassword = async (id, newPassword) => {
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  return prisma.userSistema.update({
-    where: { id: Number(id) },
-    data: { password: hashedPassword },
-  });
-};
 
-// 🔹 Actualizar usuario (nombre o email)
+// 🔹 Actualizar usuario (nombre, email, rol y/o contraseña)
 export const updateUser = async (id, data) => {
+  const { nombre, email, rol, password } = data;
+  const updateData = {};
+
+  if (nombre) updateData.nombre = nombre;
+  if (email) updateData.email = email;
+  if (rol) updateData.rol = rol;
+
+  // Si se proporciona una nueva contraseña, la encriptamos
+  if (password) {
+    updateData.password = await bcrypt.hash(password, 10);
+  }
+
+  // Verificar que no se intente cambiar el rol del superadministrador
+  const userToUpdate = await prisma.userSistema.findUnique({ where: { id: Number(id) } });
+  if (userToUpdate.username === "superadmin" && rol && rol !== userToUpdate.rol) {
+    throw new Error("No se puede cambiar el rol del superadministrador");
+  }
+
   return prisma.userSistema.update({
     where: { id: Number(id) },
-    data: {
-      nombre: data.nombre,
-      email: data.email,
-    },
+    data: updateData,
   });
 };
