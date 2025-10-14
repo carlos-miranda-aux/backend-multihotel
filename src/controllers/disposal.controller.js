@@ -2,6 +2,7 @@ import * as disposalService from "../services/disposal.service.js";
 import ExcelJS from "exceljs";
 import { logAction } from "../services/audit.service.js";
 
+
 // 📌 Obtener todas las bajas
 export const getDisposals = async (req, res) => {
   try {
@@ -30,14 +31,13 @@ export const createDisposal = async (req, res) => {
     const disposal = await disposalService.createDisposal(req.body);
 
     // AUDITORÍA
-    await logAction(userId, "CREATE", "Disposal", disposal.id, null, disposal);
+    //await logAction(userId, "CREATE", "Disposal", disposal.id, null, { ...disposal });
 
     res.status(201).json(disposal);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
-
 // 📌 Actualizar una baja
 export const updateDisposal = async (req, res) => {
   const userId = req.user.id;
@@ -48,7 +48,7 @@ export const updateDisposal = async (req, res) => {
     const disposal = await disposalService.updateDisposal(req.params.id, req.body);
 
     // AUDITORÍA
-    await logAction(userId, "UPDATE", "Disposal", req.params.id, oldDisposal, disposal);
+    //await logAction(userId, "UPDATE", "Disposal", req.params.id, { ...oldDisposal }, { ...disposal });
 
     res.json(disposal);
   } catch (error) {
@@ -66,7 +66,7 @@ export const deleteDisposal = async (req, res) => {
     await disposalService.deleteDisposal(req.params.id);
 
     // AUDITORÍA
-    await logAction(userId, "DELETE", "Disposal", req.params.id, oldDisposal, null);
+    //await logAction(userId, "DELETE", "Disposal", req.params.id, { ...oldDisposal }, null);
 
     res.json({ message: "Baja eliminada correctamente" });
   } catch (error) {

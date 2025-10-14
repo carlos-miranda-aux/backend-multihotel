@@ -1,15 +1,8 @@
 import * as authService from "../services/auth.service.js";
 import prisma from "../PrismaClient.js";
+import { logAction } from "../services/audit.service.js";
 
-export const createUser = async (req, res) => {
-  try {
-    const user = await authService.registerUser(req.body);
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-};
-
+// 📌 Login de usuarios
 export const login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
@@ -20,7 +13,7 @@ export const login = async (req, res) => {
   }
 };
 
-
+// 📌 Obtener todos los usuarios
 export const getUsers = async (req, res) => {
   try {
     const users = await authService.getUsers();
@@ -30,7 +23,7 @@ export const getUsers = async (req, res) => {
   }
 };
 
-// 🔹 Eliminar usuario
+// 📌 Eliminar usuario
 export const deleteUser = async (req, res) => {
   try {
     const userToDelete = await prisma.userSistema.findUnique({
@@ -45,6 +38,9 @@ export const deleteUser = async (req, res) => {
       return res.status(403).json({ error: "No se puede eliminar al superadministrador" });
     }
 
+    // AUDITORÍA
+    //await logAction(req.user.id, "DELETE", "userSistema", req.params.id, { ...userToDelete }, null);
+
     await authService.deleteUser(req.params.id);
     res.json({ message: "Usuario eliminado correctamente" });
   } catch (error) {
@@ -56,7 +52,6 @@ export const deleteUser = async (req, res) => {
 export const updateUserController = async (req, res) => {
   try {
     const userId = req.params.id;
-
     const oldUser = await prisma.userSistema.findUnique({
       where: { id: Number(userId) },
     });
@@ -68,11 +63,26 @@ export const updateUserController = async (req, res) => {
     const updatedUser = await authService.updateUser(userId, req.body);
 
     // AUDITORÍA
-    // Nota: Necesitas pasar el 'req' al middleware de auditoría
-    // await logAction(req.user.id, "UPDATE", "userSistema", userId, oldUser, updatedUser);
+    //await logAction(req.user.id, "UPDATE", "userSistema", userId, { ...oldUser }, { ...updatedUser });
 
     res.json({ message: "Usuario actualizado correctamente", user: updatedUser });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+
+// 📌 Crear usuario (para uso de administradores)
+export const createUser = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const user = await authService.registerUser(req.body);
+
+    // AUDITORÍA
+    //await logAction(userId, "CREATE", "userSistema", user.id, null, { ...user });
+
+    res.status(201).json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };

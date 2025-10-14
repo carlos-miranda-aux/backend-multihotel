@@ -1,6 +1,7 @@
 import * as deviceStatusService from "../services/deviceStatus.service.js";
 import { logAction } from "../services/audit.service.js";
 
+
 // 📌 Obtener todos los estados de dispositivos
 export const getDeviceStatuses = async (req, res) => {
   try {
@@ -24,12 +25,12 @@ export const getDeviceStatus = async (req, res) => {
 
 // 📌 Crear un nuevo estado de dispositivo
 export const createDeviceStatus = async (req, res) => {
-  const userId = req.user.id; // Usuario que realiza la acción
+  const userId = req.user.id;
   try {
     const status = await deviceStatusService.createDeviceStatus(req.body);
 
     // AUDITORÍA
-    await logAction(userId, "CREATE", "DeviceStatus", status.id, null, status);
+    //await logAction(userId, "CREATE", "DeviceStatus", status.id, null, { ...status });
 
     res.status(201).json(status);
   } catch (error) {
@@ -47,7 +48,7 @@ export const updateDeviceStatus = async (req, res) => {
     const status = await deviceStatusService.updateDeviceStatus(req.params.id, req.body);
 
     // AUDITORÍA
-    await logAction(userId, "UPDATE", "DeviceStatus", req.params.id, oldStatus, status);
+    //await logAction(userId, "UPDATE", "DeviceStatus", req.params.id, { ...oldStatus }, { ...status });
 
     res.json(status);
   } catch (error) {
@@ -65,7 +66,7 @@ export const deleteDeviceStatus = async (req, res) => {
     await deviceStatusService.deleteDeviceStatus(req.params.id);
 
     // AUDITORÍA
-    await logAction(userId, "DELETE", "DeviceStatus", req.params.id, oldStatus, null);
+    //await logAction(userId, "DELETE", "DeviceStatus", req.params.id, { ...oldStatus }, null);
 
     res.json({ message: "DeviceStatus deleted" });
   } catch (error) {

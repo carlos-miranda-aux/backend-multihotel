@@ -1,6 +1,6 @@
 // controllers/device.controller.js
 import * as deviceService from "../services/device.service.js";
-import { logAction } from "../services/audit.service.js"; // 🔹 Auditoría
+import { logAction } from "../services/audit.service.js";
 import ExcelJS from "exceljs";
 
 // 📌 Obtener todos los dispositivos
@@ -30,8 +30,8 @@ export const createDevice = async (req, res) => {
   try {
     const newDevice = await deviceService.createDevice(req.body);
 
-    // 🔹 AUDITORÍA
-    await logAction(userId, "CREATE", "Device", newDevice.id, null, newDevice);
+    // AUDITORÍA
+    //await logAction(userId, "CREATE", "Device", newDevice.id, null, { ...newDevice });
 
     res.status(201).json(newDevice);
   } catch (error) {
@@ -48,8 +48,8 @@ export const updateDevice = async (req, res) => {
 
     const updatedDevice = await deviceService.updateDevice(req.params.id, req.body);
 
-    // 🔹 AUDITORÍA
-    await logAction(userId, "UPDATE", "Device", req.params.id, oldDevice, updatedDevice);
+    // AUDITORÍA
+    //await logAction(userId, "UPDATE", "Device", req.params.id, { ...oldDevice }, { ...updatedDevice });
 
     res.json(updatedDevice);
   } catch (error) {
@@ -66,8 +66,8 @@ export const deleteDevice = async (req, res) => {
 
     await deviceService.deleteDevice(req.params.id);
 
-    // 🔹 AUDITORÍA
-    await logAction(userId, "DELETE", "Device", req.params.id, oldDevice, null);
+    // AUDITORÍA
+    //await logAction(userId, "DELETE", "Device", req.params.id, { ...oldDevice }, null);
 
     res.json({ message: "Dispositivo eliminado" });
   } catch (error) {

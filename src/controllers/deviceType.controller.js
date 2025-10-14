@@ -1,6 +1,7 @@
 import * as deviceTypeService from "../services/deviceType.service.js";
 import { logAction } from "../services/audit.service.js";
 
+
 // 📌 Obtener todos los tipos de dispositivo
 export const getDeviceTypes = async (req, res) => {
   try {
@@ -25,12 +26,12 @@ export const getDeviceType = async (req, res) => {
 
 // 📌 Crear un nuevo tipo de dispositivo
 export const createDeviceType = async (req, res) => {
-  const userId = req.user.id; // Usuario que realiza la acción
+  const userId = req.user.id;
   try {
     const newDeviceType = await deviceTypeService.createDeviceType(req.body);
 
     // AUDITORÍA
-    await logAction(userId, "CREATE", "DeviceType", newDeviceType.id, null, newDeviceType);
+    //await logAction(userId, "CREATE", "DeviceType", newDeviceType.id, null, { ...newDeviceType });
 
     res.status(201).json(newDeviceType);
   } catch (error) {
@@ -48,7 +49,7 @@ export const updateDeviceType = async (req, res) => {
     const updatedDeviceType = await deviceTypeService.updateDeviceType(req.params.id, req.body);
 
     // AUDITORÍA
-    await logAction(userId, "UPDATE", "DeviceType", req.params.id, oldDeviceType, updatedDeviceType);
+    //await logAction(userId, "UPDATE", "DeviceType", req.params.id, { ...oldDeviceType }, { ...updatedDeviceType });
 
     res.json(updatedDeviceType);
   } catch (error) {
@@ -66,7 +67,7 @@ export const deleteDeviceType = async (req, res) => {
     await deviceTypeService.deleteDeviceType(req.params.id);
 
     // AUDITORÍA
-    await logAction(userId, "DELETE", "DeviceType", req.params.id, oldDeviceType, null);
+    //await logAction(userId, "DELETE", "DeviceType", req.params.id, { ...oldDeviceType }, null);
 
     res.json({ message: "DeviceType deleted" });
   } catch (error) {

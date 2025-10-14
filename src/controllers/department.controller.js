@@ -1,5 +1,6 @@
 import * as departmentService from "../services/department.service.js";
 import { logAction } from "../services/audit.service.js";
+import prisma from "../PrismaClient.js"; // 👈 Nueva importación
 
 // 📌 Obtener todos los departamentos
 export const getDepartments = async (req, res) => {
@@ -24,12 +25,12 @@ export const getDepartment = async (req, res) => {
 
 // 📌 Crear un nuevo departamento
 export const createDepartment = async (req, res) => {
-  const userId = req.user?.id || null;// Usuario que hace la acción
+  const userId = req.user?.id || null;
   try {
     const department = await departmentService.createDepartment(req.body);
 
     // AUDITORÍA
-    await logAction(userId, "CREATE", "Department", department.id, null, department);
+    //await logAction(userId, "CREATE", "Department", department.id, null, { ...department });
 
     res.status(201).json(department);
   } catch (error) {
@@ -39,7 +40,7 @@ export const createDepartment = async (req, res) => {
 
 // 📌 Actualizar un departamento
 export const updateDepartment = async (req, res) => {
-  const userId = req.user?.id || null; //Devuelve "null" si no encuentra el ID de usuario
+  const userId = req.user?.id || null;
   try {
     const oldDept = await departmentService.getDepartmentById(req.params.id);
     if (!oldDept) return res.status(404).json({ message: "Department not found" });
@@ -47,7 +48,7 @@ export const updateDepartment = async (req, res) => {
     const department = await departmentService.updateDepartment(req.params.id, req.body);
 
     // AUDITORÍA
-    await logAction(userId, "UPDATE", "Department", req.params.id, oldDept, department);
+    //await logAction(userId, "UPDATE", "Department", req.params.id, { ...oldDept }, { ...department }); // 👈 Copia simple
 
     res.json(department);
   } catch (error) {
@@ -65,7 +66,7 @@ export const deleteDepartment = async (req, res) => {
     await departmentService.deleteDepartment(req.params.id);
 
     // AUDITORÍA
-    await logAction(userId, "DELETE", "Department", req.params.id, oldDept, null);
+    //await logAction(userId, "DELETE", "Department", req.params.id, { ...oldDept }, null); // 👈 Copia simple
 
     res.json({ message: "Department deleted" });
   } catch (error) {

@@ -1,6 +1,7 @@
 import * as maintenanceService from "../services/maintenance.service.js";
 import { logAction } from "../services/audit.service.js";
 
+
 // 📌 Obtener todos los mantenimientos
 export const getMaintenances = async (req, res) => {
   try {
@@ -29,7 +30,7 @@ export const createMaintenance = async (req, res) => {
     const newMaintenance = await maintenanceService.createMaintenance(req.body);
 
     // AUDITORÍA
-    await logAction(userId, "CREATE", "Maintenance", newMaintenance.id, null, newMaintenance);
+    //await logAction(userId, "CREATE", "Maintenance", newMaintenance.id, null, { ...newMaintenance });
 
     res.status(201).json(newMaintenance);
   } catch (error) {
@@ -47,7 +48,7 @@ export const updateMaintenance = async (req, res) => {
     const updatedMaintenance = await maintenanceService.updateMaintenance(req.params.id, req.body);
 
     // AUDITORÍA
-    await logAction(userId, "UPDATE", "Maintenance", req.params.id, oldMaintenance, updatedMaintenance);
+    //await logAction(userId, "UPDATE", "Maintenance", req.params.id, { ...oldMaintenance }, { ...updatedMaintenance });
 
     res.json(updatedMaintenance);
   } catch (error) {
@@ -65,7 +66,7 @@ export const deleteMaintenance = async (req, res) => {
     await maintenanceService.deleteMaintenance(req.params.id);
 
     // AUDITORÍA
-    await logAction(userId, "DELETE", "Maintenance", req.params.id, oldMaintenance, null);
+    //await logAction(userId, "DELETE", "Maintenance", req.params.id, { ...oldMaintenance }, null);
 
     res.json({ message: "Maintenance deleted" });
   } catch (error) {

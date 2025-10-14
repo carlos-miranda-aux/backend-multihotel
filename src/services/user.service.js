@@ -1,7 +1,7 @@
 import prisma from "../../src/PrismaClient.js";
 
 export const getUsers = () => prisma.user.findMany({
-  include: { departamento: true } // traemos también el departamento
+  include: { departamento: true }
 });
 
 export const getUserById = (id) => prisma.user.findUnique({

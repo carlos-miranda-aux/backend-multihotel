@@ -40,7 +40,7 @@ export const getInactiveDevices = () =>
   prisma.device.findMany({
     where: {
       estado: {
-        nombre: "Inactivo", // 👈 asegúrate que así se llama en tu tabla DeviceStatus
+        nombre: "Inactivo",
       },
     },
     include: {
@@ -48,6 +48,6 @@ export const getInactiveDevices = () =>
       tipo: true,
       estado: true,
       sistema_operativo: true,
-      disposals: true, // 👈 traemos la info de bajas también
+      disposals: true,
     },
   });

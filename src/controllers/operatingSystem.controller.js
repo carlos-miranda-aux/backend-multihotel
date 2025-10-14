@@ -38,7 +38,7 @@ export const createOperatingSystemController = async (req, res) => {
     const newSystem = await createOperatingSystem(req.body);
 
     // AUDITORÍA
-    await logAction(userId, "CREATE", "OperatingSystem", newSystem.id, null, newSystem);
+    //await logAction(userId, "CREATE", "OperatingSystem", newSystem.id, null, { ...newSystem });
 
     res.status(201).json(newSystem);
   } catch (error) {
@@ -56,7 +56,7 @@ export const updateOperatingSystemController = async (req, res) => {
     const updatedSystem = await updateOperatingSystem(req.params.id, req.body);
 
     // AUDITORÍA
-    await logAction(userId, "UPDATE", "OperatingSystem", req.params.id, oldSystem, updatedSystem);
+    //await logAction(userId, "UPDATE", "OperatingSystem", req.params.id, { ...oldSystem }, { ...updatedSystem });
 
     res.json(updatedSystem);
   } catch (error) {
@@ -74,7 +74,7 @@ export const deleteOperatingSystemController = async (req, res) => {
     await deleteOperatingSystem(req.params.id);
 
     // AUDITORÍA
-    await logAction(userId, "DELETE", "OperatingSystem", req.params.id, oldSystem, null);
+    //await logAction(userId, "DELETE", "OperatingSystem", req.params.id, { ...oldSystem }, null);
 
     res.json({ message: "OperatingSystem deleted" });
   } catch (error) {

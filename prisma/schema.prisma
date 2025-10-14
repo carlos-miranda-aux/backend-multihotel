@@ -45,14 +45,13 @@ model User {
   correo         String       @unique
   departamento   Department?  @relation(fields: [departamentoId], references: [id])
   departamentoId Int?
-  ip_equipo      String?
   usuario_login  String?
   password_login String?
   created_at     DateTime     @default(now())
 
   devices Device[]
 
-  @@index([departamentoId]) // 🔹 Búsquedas rápidas por departamento del usuario
+  @@index([departamentoId])
 }
 
 model Device {
@@ -60,15 +59,14 @@ model Device {
   etiqueta             String   @unique
   nombre_equipo        String?
   descripcion          String?
-
+  ip_equipo            String? // 👈 Campo movido aquí
   usuario              User?    @relation(fields: [usuarioId], references: [id])
   usuarioId            Int?
-
   departamento         Department? @relation(fields: [departamentoId], references: [id])
-  departamentoId       Int?       // 🔹 Relación directa con Department
+  departamentoId       Int?
 
   tipoId               Int?
-  tipo                 DeviceType?   @relation(fields: [tipoId], references: [id])
+  tipo                 DeviceType? @relation(fields: [tipoId], references: [id])
 
   marca                String?
   modelo               String?
@@ -94,7 +92,6 @@ model Device {
   maintenances Maintenance[]
   disposals    Disposal[]
 
-  // 🔹 Índices para consultas rápidas
   @@index([usuarioId])
   @@index([departamentoId])
   @@index([tipoId])
@@ -112,7 +109,7 @@ model Maintenance {
   device            Device   @relation(fields: [deviceId], references: [id])
   deviceId          Int
 
-  @@index([deviceId]) // 🔹 Búsquedas rápidas por dispositivo
+  @@index([deviceId])
 }
 
 model Disposal {
@@ -124,7 +121,7 @@ model Disposal {
   device        Device   @relation(fields: [deviceId], references: [id])
   deviceId      Int
 
-  @@index([deviceId]) // 🔹 Búsquedas rápidas por dispositivo
+  @@index([deviceId])
 }
 
 enum Rol {
@@ -156,7 +153,7 @@ model AuditLog {
 
   user userSistema? @relation(fields: [userId], references: [id])
 
-  @@index([userId])      // 🔹 Para filtrar rápido por usuario
-  @@index([resource])    // 🔹 Para filtrar por recurso
-  @@index([createdAt])   // 🔹 Para búsquedas por fecha
+  @@index([userId])
+  @@index([resource])
+  @@index([createdAt])
 }
