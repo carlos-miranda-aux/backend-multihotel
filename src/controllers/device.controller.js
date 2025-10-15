@@ -1,10 +1,11 @@
 // controllers/device.controller.js
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
+import prisma from "../PrismaClient.js";
 
 export const getDevices = async (req, res) => {
   try {
-    const devices = await deviceService.getActiveDevices(); // 👈 Usamos el nuevo servicio
+    const devices = await deviceService.getActiveDevices();
     res.json(devices);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener dispositivos" });
@@ -23,10 +24,25 @@ export const getDevice = async (req, res) => {
 
 export const createDevice = async (req, res) => {
   try {
-    const newDevice = await deviceService.createDevice(req.body);
+    const { ...deviceData } = req.body;
+    
+    // Buscar el ID del estado "Activo"
+    const estadoActivo = await prisma.deviceStatus.findFirst({
+      where: { nombre: "Activo" },
+    });
+
+    if (!estadoActivo) {
+      return res.status(400).json({ error: 'No existe un estado llamado "Activo" en la base de datos.' });
+    }
+
+    const newDevice = await deviceService.createDevice({
+      ...deviceData,
+      estadoId: estadoActivo.id, // Asignar el ID del estado "Activo" por defecto
+    });
     res.status(201).json(newDevice);
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: "Error al crear el dispositivo" });
   }
 };
 
@@ -41,6 +57,7 @@ export const updateDevice = async (req, res) => {
   }
 };
 
+// 📌 Modificada para eliminar el dispositivo permanentemente
 export const deleteDevice = async (req, res) => {
   try {
     const oldDevice = await deviceService.getDeviceById(req.params.id);
