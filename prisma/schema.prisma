@@ -86,8 +86,10 @@ model Device {
 
   fecha_proxima_revision DateTime?
 
+  motivo_baja          String?   @db.VarChar(191)
+  observaciones_baja   String?   @db.Text
+
   maintenances Maintenance[]
-  // disposals    Disposal[] 👈 Elimina esta línea
 
   @@index([usuarioId])
   @@index([departamentoId])

@@ -1,7 +1,7 @@
 // controllers/device.controller.js
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
-import prisma from "../PrismaClient.js"; // 👈 CORRECCIÓN: Asegúrate que Prisma esté importado
+import prisma from "../PrismaClient.js"; // 👈 Asegúrate que Prisma esté importado
 
 export const getDevices = async (req, res) => {
   try {
@@ -42,11 +42,14 @@ export const createDevice = async (req, res) => {
       sistemaOperativoId: deviceData.sistemaOperativoId ? Number(deviceData.sistemaOperativoId) : null,
       fecha_proxima_revision: fecha_proxima_revision || null,
       estadoId: estadoActivo.id,
+      // Los campos motivo_baja y observaciones_baja se dejan nulos por defecto
     };
 
     const newDevice = await deviceService.createDevice(dataToCreate);
 
+    // 👈 CORRECCIÓN (Lógica de Mantenimiento Preventivo)
     if (fecha_proxima_revision) {
+      // (Esta lógica está bien, crea el mantenimiento inicial)
       await prisma.maintenance.create({
         data: {
           descripcion: "Revisión preventiva inicial (creada automáticamente)",
@@ -64,10 +67,11 @@ export const createDevice = async (req, res) => {
   }
 };
 
-// 👇 --- FUNCIÓN 'updateDevice' COMPLETAMENTE REEMPLAZADA --- 👇
+
 export const updateDevice = async (req, res) => {
   try {
-    const oldDevice = await deviceService.getDeviceById(req.params.id);
+    const deviceId = Number(req.params.id);
+    const oldDevice = await deviceService.getDeviceById(deviceId);
     if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
     
     const dataToUpdate = { ...req.body };
@@ -75,28 +79,50 @@ export const updateDevice = async (req, res) => {
     const disposedStatus = await prisma.deviceStatus.findFirst({
         where: { nombre: "Baja" },
     });
+    
+    const disposedStatusId = disposedStatus?.id;
 
-    if (disposedStatus) {
-        if (dataToUpdate.estadoId === disposedStatus.id && !oldDevice.fecha_baja) {
-            dataToUpdate.fecha_baja = new Date();
-        } else if (dataToUpdate.estadoId !== disposedStatus.id && oldDevice.fecha_baja) {
-            dataToUpdate.fecha_baja = null;
-        }
+    // -----------------------------------------------------------
+    // 👈 CORRECCIÓN 1: LÓGICA DE VALIDACIÓN DE BAJA (Soft-Delete)
+    // -----------------------------------------------------------
+    const isAlreadyBaja = oldDevice.estadoId === disposedStatusId;
+    const isTryingToChangeStatus = dataToUpdate.estadoId && dataToUpdate.estadoId !== oldDevice.estadoId;
+    const isTryingToReactivate = isAlreadyBaja && isTryingToChangeStatus;
+
+    if (isTryingToReactivate) {
+      // SI YA ESTÁ DE BAJA E INTENTAN CAMBIAR EL ESTADO (REACTIVAR)
+      return res.status(403).json({ error: "No se puede reactivar un equipo que ya ha sido dado de baja." });
+    
+    } else if (isAlreadyBaja) {
+      // SI YA ESTÁ DE BAJA Y NO INTENTAN CAMBIAR EL ESTADO (solo editan notas)
+      // Forzamos que el estadoId siga siendo "Baja"
+      dataToUpdate.estadoId = disposedStatusId;
+    
+    } else if (dataToUpdate.estadoId === disposedStatusId) {
+      // SI ESTÁ ACTIVO Y LO ESTÁN DANDO DE BAJA (NUEVA BAJA)
+      // Asignamos la fecha de baja
+      dataToUpdate.fecha_baja = new Date();
     }
+    // -----------------------------------------------------------
+    // 👆 FIN DE LA CORRECCIÓN 1
+    // -----------------------------------------------------------
+
     
     const { fecha_proxima_revision } = dataToUpdate;
     const oldRevisionDate = oldDevice.fecha_proxima_revision ? new Date(oldDevice.fecha_proxima_revision).toISOString().split('T')[0] : null;
     
-    // 👈 CORRECCIÓN: Lógica de actualización de mantenimiento preventivo
+    // -----------------------------------------------------------
+    // 👈 CORRECCIÓN 2: LÓGICA DE MANTENIMIENTO PREVENTIVO
+    // -----------------------------------------------------------
     if (fecha_proxima_revision && fecha_proxima_revision !== oldRevisionDate) {
       
-      // 1. Buscar si ya existe una revisión preventiva PENDIENTE para este equipo
+      // 1. Buscar si ya existe una revisión preventiva PENDIENTE
       const existingPreventiveMaint = await prisma.maintenance.findFirst({
         where: {
           deviceId: oldDevice.id,
           estado: "pendiente",
           descripcion: {
-            contains: "Revisión preventiva" 
+            contains: "Revisión preventiva" // Busca las creadas auto
           }
         }
       });
@@ -111,7 +137,7 @@ export const updateDevice = async (req, res) => {
           }
         });
       } else {
-        // 3. Si no existe, CREA una nueva
+        // 3. Si no existe (o ya se completó), CREA una nueva
         await prisma.maintenance.create({
             data: {
                 descripcion: "Revisión preventiva (actualizada)",
@@ -122,8 +148,11 @@ export const updateDevice = async (req, res) => {
         });
       }
     }
+    // -----------------------------------------------------------
+    // 👆 FIN DE LA CORRECCIÓN 2
+    // -----------------------------------------------------------
     
-    const updatedDevice = await deviceService.updateDevice(req.params.id, dataToUpdate);
+    const updatedDevice = await deviceService.updateDevice(deviceId, dataToUpdate);
     
     res.json(updatedDevice);
   } catch (error) {
@@ -131,7 +160,26 @@ export const updateDevice = async (req, res) => {
     res.status(500).json({ error: "Error al actualizar dispositivo" });
   }
 };
-// 👆 --- FIN DE LA FUNCIÓN --- 👆
+
+
+// -----------------------------------------------------------
+// 👈 CORRECCIÓN 3: FUNCIÓN DELETE COMENTADA (Soft-Delete)
+// -----------------------------------------------------------
+/*
+export const deleteDevice = async (req, res) => {
+  try {
+    const oldDevice = await deviceService.getDeviceById(req.params.id);
+    if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
+    await deviceService.deleteDevice(req.params.id);
+    res.json({ message: "Dispositivo eliminado" });
+  } catch (error) {
+    res.status(500).json({ error: "Error al eliminar dispositivo" });
+  }
+};
+*/
+// -----------------------------------------------------------
+// 👆 FIN DE LA CORRECCIÓN 3
+// -----------------------------------------------------------
 
 
 export const exportInactiveDevices = async (req, res) => {
@@ -145,7 +193,11 @@ export const exportInactiveDevices = async (req, res) => {
       { header: "Tipo", key: "tipo", width: 20 },
       { header: "Marca", key: "marca", width: 20 },
       { header: "Modelo", key: "modelo", width: 20 },
-      { header: "Observaciones", key: "observaciones", width: 30 },
+      // -----------------------------------------------------------
+      // 👈 CORRECCIÓN 4: Leer los campos correctos del modelo Device
+      // -----------------------------------------------------------
+      { header: "Motivo", key: "motivo_baja", width: 30 },
+      { header: "Observaciones", key: "observaciones_baja", width: 30 },
     ];
     inactiveDevices.forEach((device, index) => {
       worksheet.addRow({
@@ -154,9 +206,13 @@ export const exportInactiveDevices = async (req, res) => {
         tipo: device.tipo?.nombre || "",
         marca: device.marca || "",
         modelo: device.modelo || "",
-        observaciones: device.disposals?.[0]?.observaciones || "",
+        motivo_baja: device.motivo_baja || "N/A", // 👈 CORRECCIÓN
+        observaciones_baja: device.observaciones_baja || "N/A", // 👈 CORRECCIÓN
       });
     });
+    // -----------------------------------------------------------
+    // 👆 FIN DE LA CORRECCIÓN 4
+    // -----------------------------------------------------------
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).alignment = { horizontal: "center" };
     res.setHeader(
