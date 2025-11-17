@@ -47,7 +47,7 @@ model User {
   departamentoId Int?
   usuario_login  String?
   created_at     DateTime     @default(now())
-
+  es_jefe_de_area Boolean   @default(false)
   devices Device[]
 
   @@index([departamentoId])
