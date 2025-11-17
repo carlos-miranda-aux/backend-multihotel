@@ -1,5 +1,6 @@
 // controllers/device.controller.js
 import * as deviceService from "../services/device.service.js";
+// (Importaciones de email y maintenanceService eliminadas)
 import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
 
@@ -22,9 +23,10 @@ export const getDevice = async (req, res) => {
   }
 };
 
+// 👇 --- FUNCIÓN CON LÓGICA DE FASE 1 (PERO SIN EMAIL) --- 👇
 export const createDevice = async (req, res) => {
   try {
-    const { ...deviceData } = req.body;
+    const { fecha_proxima_revision, ...deviceData } = req.body;
     
     const estadoActivo = await prisma.deviceStatus.findFirst({
       where: { nombre: "Activo" },
@@ -34,18 +36,40 @@ export const createDevice = async (req, res) => {
       return res.status(400).json({ error: 'No existe un estado llamado "Activo" en la base de datos.' });
     }
 
-    const newDevice = await deviceService.createDevice({
+    const dataToCreate = {
       ...deviceData,
+      departamentoId: deviceData.departamentoId ? Number(deviceData.departamentoId) : null,
+      usuarioId: deviceData.usuarioId ? Number(deviceData.usuarioId) : null,
+      tipoId: deviceData.tipoId ? Number(deviceData.tipoId) : null,
+      sistemaOperativoId: deviceData.sistemaOperativoId ? Number(deviceData.sistemaOperativoId) : null,
+      fecha_proxima_revision: fecha_proxima_revision || null,
       estadoId: estadoActivo.id,
-    });
+    };
+
+    const newDevice = await deviceService.createDevice(dataToCreate);
+
+    // ESTA ES LA LÓGICA DE LA FASE 1 (SE QUEDA)
+    if (fecha_proxima_revision) {
+      await prisma.maintenance.create({
+        data: {
+          descripcion: "Revisión preventiva inicial (creada automáticamente)",
+          fecha_programada: new Date(fecha_proxima_revision),
+          estado: "pendiente",
+          deviceId: newDevice.id,
+        }
+      });
+      // (Lógica de email eliminada)
+    }
+
     res.status(201).json(newDevice);
   } catch (error) {
-    console.error(error);
+    console.error("Error al crear el dispositivo:", error);
     res.status(500).json({ error: "Error al crear el dispositivo" });
   }
 };
+// 👆 --- FIN DE LA FUNCIÓN --- 👆
 
-// 📌 Lógica corregida para el manejo de la fecha de baja
+// 👇 --- FUNCIÓN CON LÓGICA DE FASE 1 (PERO SIN EMAIL) --- 👇
 export const updateDevice = async (req, res) => {
   try {
     const oldDevice = await deviceService.getDeviceById(req.params.id);
@@ -65,14 +89,31 @@ export const updateDevice = async (req, res) => {
         }
     }
     
+    const { fecha_proxima_revision } = dataToUpdate;
+    const oldRevisionDate = oldDevice.fecha_proxima_revision ? new Date(oldDevice.fecha_proxima_revision).toISOString().split('T')[0] : null;
+    
+    // ESTA ES LA LÓGICA DE LA FASE 1 (SE QUEDA)
+    if (fecha_proxima_revision && fecha_proxima_revision !== oldRevisionDate) {
+      await prisma.maintenance.create({
+          data: {
+              descripcion: "Revisión preventiva (actualizada)",
+              fecha_programada: new Date(fecha_proxima_revision),
+              estado: "pendiente",
+              deviceId: oldDevice.id,
+          }
+      });
+      // (Lógica de email eliminada)
+    }
+    
     const updatedDevice = await deviceService.updateDevice(req.params.id, dataToUpdate);
     
     res.json(updatedDevice);
   } catch (error) {
-    console.error(error);
+    console.error("Error al actualizar dispositivo:", error);
     res.status(500).json({ error: "Error al actualizar dispositivo" });
   }
 };
+// 👆 --- FIN DE LA FUNCIÓN --- 👆
 
 export const deleteDevice = async (req, res) => {
   try {
@@ -128,11 +169,10 @@ export const exportInactiveDevices = async (req, res) => {
 
 export const exportAllDevices = async (req, res) => {
   try {
-    const devices = await deviceService.getActiveDevices(); // O getDevices() si quieres todos
+    const devices = await deviceService.getActiveDevices();
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Inventario Activo");
 
-    // Define columnas más completas
     worksheet.columns = [
       { header: "Etiqueta", key: "etiqueta", width: 20 },
       { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },
@@ -155,7 +195,7 @@ export const exportAllDevices = async (req, res) => {
         modelo: device.modelo || "",
         numero_serie: device.numero_serie || "",
         usuario: device.usuario?.nombre || "N/A",
-        departamento: device.departamento?.nombre || "N/A", // Necesitarás añadir 'departamento' al include de getActiveDevices en device.service.js
+        departamento: device.departamento?.nombre || "N/A",
         estado: device.estado?.nombre || "N/A",
         so: device.sistema_operativo?.nombre || "N/A",
       });

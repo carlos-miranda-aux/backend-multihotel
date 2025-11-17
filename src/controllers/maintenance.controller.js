@@ -1,5 +1,7 @@
+// src/controllers/maintenance.controller.js
 import * as maintenanceService from "../services/maintenance.service.js";
 import ExcelJS from "exceljs";
+// (Importaciones de email y prisma eliminadas)
 
 export const getMaintenances = async (req, res) => {
   try {
@@ -20,14 +22,18 @@ export const getMaintenance = async (req, res) => {
   }
 };
 
+// 👇 --- FUNCIÓN REVERTIDA --- 👇
+// (Ya no tiene la lógica de envío de email)
 export const createMaintenance = async (req, res) => {
   try {
     const newMaintenance = await maintenanceService.createMaintenance(req.body);
+    // (Lógica de email eliminada)
     res.status(201).json(newMaintenance);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+// 👆 --- FIN DE LA FUNCIÓN --- 👆
 
 export const updateMaintenance = async (req, res) => {
   try {
