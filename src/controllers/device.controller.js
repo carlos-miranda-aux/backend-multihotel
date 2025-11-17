@@ -67,64 +67,6 @@ export const createDevice = async (req, res) => {
     res.status(500).json({ error: "Error al crear el dispositivo" });
   }
 };
-// 👆 --- FIN DE LA FUNCIÓN --- 👆
-
-// 👇 --- FUNCIÓN CON LÓGICA DE FASE 1 (PERO SIN EMAIL) --- 👇
-export const updateDevice = async (req, res) => {
-  try {
-    const oldDevice = await deviceService.getDeviceById(req.params.id);
-    if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
-    
-    const dataToUpdate = { ...req.body };
-
-    const disposedStatus = await prisma.deviceStatus.findFirst({
-        where: { nombre: "Baja" },
-    });
-
-    if (disposedStatus) {
-        if (dataToUpdate.estadoId === disposedStatus.id && !oldDevice.fecha_baja) {
-            dataToUpdate.fecha_baja = new Date();
-        } else if (dataToUpdate.estadoId !== disposedStatus.id && oldDevice.fecha_baja) {
-            dataToUpdate.fecha_baja = null;
-        }
-    }
-    
-    const { fecha_proxima_revision } = dataToUpdate;
-    const oldRevisionDate = oldDevice.fecha_proxima_revision ? new Date(oldDevice.fecha_proxima_revision).toISOString().split('T')[0] : null;
-    
-    // ESTA ES LA LÓGICA DE LA FASE 1 (SE QUEDA)
-    if (fecha_proxima_revision && fecha_proxima_revision !== oldRevisionDate) {
-      await prisma.maintenance.create({
-          data: {
-              descripcion: "Revisión preventiva (actualizada)",
-              fecha_programada: new Date(fecha_proxima_revision),
-              estado: "pendiente",
-              deviceId: oldDevice.id,
-          }
-      });
-      // (Lógica de email eliminada)
-    }
-    
-    const updatedDevice = await deviceService.updateDevice(req.params.id, dataToUpdate);
-    
-    res.json(updatedDevice);
-  } catch (error) {
-    console.error("Error al actualizar dispositivo:", error);
-    res.status(500).json({ error: "Error al actualizar dispositivo" });
-  }
-};
-// 👆 --- FIN DE LA FUNCIÓN --- 👆
-
-export const deleteDevice = async (req, res) => {
-  try {
-    const oldDevice = await deviceService.getDeviceById(req.params.id);
-    if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
-    await deviceService.deleteDevice(req.params.id);
-    res.json({ message: "Dispositivo eliminado" });
-  } catch (error) {
-    res.status(500).json({ error: "Error al eliminar dispositivo" });
-  }
-};
 
 export const exportInactiveDevices = async (req, res) => {
   try {
@@ -215,5 +157,75 @@ export const exportAllDevices = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error al exportar inventario" });
+  }
+};
+
+export const updateDevice = async (req, res) => {
+  try {
+    const oldDevice = await deviceService.getDeviceById(req.params.id);
+    if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
+
+    const dataToUpdate = { ...req.body };
+
+    const disposedStatus = await prisma.deviceStatus.findFirst({
+        where: { nombre: "Baja" },
+    });
+
+    if (disposedStatus) {
+        if (dataToUpdate.estadoId === disposedStatus.id && !oldDevice.fecha_baja) {
+            dataToUpdate.fecha_baja = new Date();
+        } else if (dataToUpdate.estadoId !== disposedStatus.id && oldDevice.fecha_baja) {
+            dataToUpdate.fecha_baja = null;
+        }
+    }
+
+    const { fecha_proxima_revision } = dataToUpdate;
+    const oldRevisionDate = oldDevice.fecha_proxima_revision ? new Date(oldDevice.fecha_proxima_revision).toISOString().split('T')[0] : null;
+
+    // 👇 --- INICIO DE LA LÓGICA CORREGIDA --- 👇
+    if (fecha_proxima_revision && fecha_proxima_revision !== oldRevisionDate) {
+
+      // 1. Buscar si ya existe una revisión preventiva PENDIENTE para este equipo
+      const existingPreventiveMaint = await prisma.maintenance.findFirst({
+        where: {
+          deviceId: oldDevice.id,
+          estado: "pendiente",
+          // Usamos 'contains' para encontrar la revisión automática
+          descripcion: {
+            contains: "Revisión preventiva" 
+          }
+        }
+      });
+
+      if (existingPreventiveMaint) {
+        // 2. Si existe, ACTUALIZA la fecha
+        await prisma.maintenance.update({
+          where: { id: existingPreventiveMaint.id },
+          data: {
+            fecha_programada: new Date(fecha_proxima_revision),
+            descripcion: "Revisión preventiva (fecha actualizada)"
+          }
+        });
+      } else {
+        // 3. Si no existe, CREA una nueva
+        await prisma.maintenance.create({
+            data: {
+                descripcion: "Revisión preventiva (actualizada)",
+                fecha_programada: new Date(fecha_proxima_revision),
+                estado: "pendiente",
+                deviceId: oldDevice.id,
+            }
+        });
+      }
+      // (Lógica de email eliminada)
+    }
+    // 👆 --- FIN DE LA LÓGICA CORREGIDA --- 👆
+
+    const updatedDevice = await deviceService.updateDevice(req.params.id, dataToUpdate);
+
+    res.json(updatedDevice);
+  } catch (error) {
+    console.error("Error al actualizar dispositivo:", error);
+    res.status(500).json({ error: "Error al actualizar dispositivo" });
   }
 };

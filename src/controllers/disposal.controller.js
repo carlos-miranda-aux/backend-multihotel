@@ -21,15 +21,6 @@ export const getDisposal = async (req, res) => {
   }
 };
 
-export const createDisposal = async (req, res) => {
-  try {
-    const disposal = await disposalService.createDisposal(req.body);
-    res.status(201).json(disposal);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-};
-
 export const updateDisposal = async (req, res) => {
   try {
     const oldDisposal = await disposalService.getDisposal(req.params.id);
