@@ -2,28 +2,35 @@
 import * as maintenanceService from "../services/maintenance.service.js";
 import ExcelJS from "exceljs";
 
-// ... (Las funciones 'getMaintenances', 'getMaintenance', 'createMaintenance', 'updateMaintenance', 'deleteMaintenance', 'exportMaintenances' están bien y no tienen cambios) ...
-
 export const getMaintenances = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const statusFilter = req.query.status || null;
+    const search = req.query.search || ""; // 👈 Capturamos búsqueda
     const skip = (page - 1) * limit;
 
     const whereClause = {};
+    
+    // Filtro de estado
     if (statusFilter === 'pendiente') {
       whereClause.estado = 'pendiente';
     } else if (statusFilter === 'historial') {
-      whereClause.estado = {
-        in: ['realizado', 'cancelado']
+      whereClause.estado = { in: ['realizado', 'cancelado'] };
+    }
+
+    // 👈 CORRECCIÓN: Filtro de búsqueda combinado con estado
+    if (search) {
+      whereClause.AND = { // Usamos AND para respetar el filtro de estado si existe
+        OR: [
+          { descripcion: { contains: search } },
+          { device: { etiqueta: { contains: search } } },
+          { device: { nombre_equipo: { contains: search } } }
+        ]
       };
     }
     
-    const { 
-      maintenances, 
-      totalCount 
-    } = await maintenanceService.getMaintenances({ 
+    const { maintenances, totalCount } = await maintenanceService.getMaintenances({ 
       skip, 
       take: limit, 
       where: whereClause 
@@ -41,6 +48,10 @@ export const getMaintenances = async (req, res) => {
   }
 };
 
+// ... (El resto del archivo MANTENLO IGUAL a la versión corregida que te di antes, 
+// incluyendo getMaintenance, create, update, delete, y las exportaciones corregidas).
+// Solo modifiqué 'getMaintenances' aquí para agregar la búsqueda.
+// Asegúrate de conservar las funciones de exportación corregidas que ya tienes.
 export const getMaintenance = async (req, res) => {
   try {
     const maintenance = await maintenanceService.getMaintenanceById(req.params.id);
@@ -125,14 +136,8 @@ export const exportMaintenances = async (req, res) => {
     });
     
     worksheet.getRow(1).font = { bold: true };
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=mantenimientos.xlsx"
-    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=mantenimientos.xlsx");
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -141,27 +146,18 @@ export const exportMaintenances = async (req, res) => {
   }
 };
 
-// -----------------------------------------------------------
-// 👈 VERSIÓN 100% CORREGIDA de 'exportIndividualMaintenance'
-// -----------------------------------------------------------
 export const exportIndividualMaintenance = async (req, res) => {
   try {
     const { id } = req.params;
     const maintenance = await maintenanceService.getMaintenanceById(id);
 
-    if (!maintenance) {
-      return res.status(404).json({ error: "Mantenimiento no encontrado" });
-    }
-
-    if (!maintenance.device) {
-      return res.status(404).json({ error: "No se encontró el dispositivo asociado a este mantenimiento." });
-    }
+    if (!maintenance) return res.status(404).json({ error: "Mantenimiento no encontrado" });
+    if (!maintenance.device) return res.status(404).json({ error: "No se encontró el dispositivo asociado a este mantenimiento." });
     const device = maintenance.device;
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Formato de Servicio");
 
-    // --- Estilo de Formato ---
     worksheet.mergeCells('A1:D1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `Formato de Servicio - Manto #${maintenance.id}`;
@@ -173,7 +169,6 @@ export const exportIndividualMaintenance = async (req, res) => {
     worksheet.getColumn('C').width = 20;
     worksheet.getColumn('D').width = 30;
 
-    // --- Sección de Dispositivo ---
     worksheet.mergeCells('A3:D3');
     const deviceTitle = worksheet.getCell('A3');
     deviceTitle.value = "Detalles del Equipo";
@@ -188,12 +183,8 @@ export const exportIndividualMaintenance = async (req, res) => {
     worksheet.getCell('A5').value = "Tipo";
     worksheet.getCell('B5').value = device.tipo?.nombre || "N/A";
     worksheet.getCell('C5').value = "Marca / Modelo";
-    // 
-    // 🛑 ¡AQUÍ ESTABA EL ERROR 1! 🛑
-    //
     worksheet.getCell('D5').value = `${device.marca || ''} / ${device.modelo || ''}`;
 
-    // --- Sección de Usuario ---
     worksheet.mergeCells('A7:D7');
     const userTitle = worksheet.getCell('A7');
     userTitle.value = "Asignación";
@@ -205,7 +196,6 @@ export const exportIndividualMaintenance = async (req, res) => {
     worksheet.getCell('C8').value = "Departamento";
     worksheet.getCell('D8').value = device.departamento?.nombre || "N/A";
 
-    // --- Sección de Mantenimiento ---
     worksheet.mergeCells('A10:D10');
     const mantoTitle = worksheet.getCell('A10');
     mantoTitle.value = "Detalles del Servicio";
@@ -227,7 +217,6 @@ export const exportIndividualMaintenance = async (req, res) => {
     descCell.value = maintenance.descripcion;
     descCell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
 
-    // --- Nueva sección de Reporte ---
     worksheet.mergeCells('A18:D18');
     const reporteTitle = worksheet.getCell('A18');
     reporteTitle.value = "Reporte del Técnico";
@@ -255,32 +244,21 @@ export const exportIndividualMaintenance = async (req, res) => {
     obsCell.value = maintenance.observaciones || (maintenance.estado === 'realizado' ? 'No especificado' : 'N/A');
     obsCell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
     
-    // --- Firma (recorremos las filas) ---
     worksheet.getCell('A34').value = "Técnico Realiza:";
     worksheet.mergeCells('B34:C34');
     worksheet.getCell('B34').border = { bottom: { style: 'thin' } };
     
-    // 
-    // 🛑 ¡AQUÍ ESTABA EL ERROR 2! 🛑
-    //
     worksheet.getCell('A36').value = "Usuario Recibe:";
     worksheet.mergeCells('B36:C36');
     worksheet.getCell('B36').border = { bottom: { style: 'thin' } };
 
-    // --- Enviar el archivo ---
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=Servicio_Manto_${id}.xlsx`
-    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=Servicio_Manto_${id}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
 
   } catch (error) {
-    console.error("Error al exportar el formato de servicio:", error); // ✅ Correcto
+    console.error("Error detallado al exportar el formato de servicio:", error.message);
     res.status(500).json({ error: "Error al exportar el formato de servicio" });
   }
 };

@@ -1,24 +1,31 @@
 // src/services/user.service.js
 import prisma from "../../src/PrismaClient.js";
 
-// --- getUsers (Paginada) - Sin cambios ---
-export const getUsers = async ({ skip, take }) => {
+export const getUsers = async ({ skip, take, search }) => {
+  // 👈 CORRECCIÓN: Filtro de búsqueda
+  const whereClause = search ? {
+    OR: [
+      { nombre: { contains: search } },
+      { correo: { contains: search } },
+      { usuario_login: { contains: search } }
+    ]
+  } : {};
+
   const [users, totalCount] = await prisma.$transaction([
     prisma.user.findMany({
+      where: whereClause, // Aplicar filtro
       include: { departamento: true },
       skip: skip,
       take: take,
-      orderBy: {
-        nombre: 'asc'
-      }
+      orderBy: { nombre: 'asc' }
     }),
-    prisma.user.count()
+    prisma.user.count({ where: whereClause }) // Contar filtrados
   ]);
 
   return { users, totalCount };
 };
 
-// 👈 CORRECCIÓN: Nueva función para poblar dropdowns
+// ... (Resto de funciones: getAllUsers, getUserById, etc. SIN CAMBIOS)
 export const getAllUsers = () => prisma.user.findMany({
   select: {
     id: true,
@@ -29,7 +36,6 @@ export const getAllUsers = () => prisma.user.findMany({
   }
 });
 
-// --- Resto de funciones (sin cambios) ---
 export const getUserById = (id) => prisma.user.findUnique({
   where: { id: Number(id) },
   include: { departamento: true }

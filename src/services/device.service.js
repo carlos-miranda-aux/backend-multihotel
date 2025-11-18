@@ -1,8 +1,7 @@
 // src/services/device.service.js
 import prisma from "../../src/PrismaClient.js";
 
-// --- getActiveDevices (Paginada) - Sin cambios ---
-export const getActiveDevices = async ({ skip, take }) => {
+export const getActiveDevices = async ({ skip, take, search }) => {
   const whereClause = {
     estado: {
       NOT: {
@@ -10,6 +9,18 @@ export const getActiveDevices = async ({ skip, take }) => {
       },
     },
   };
+
+  // 👈 CORRECCIÓN: Lógica de búsqueda
+  if (search) {
+    whereClause.OR = [
+      { etiqueta: { contains: search } },
+      { nombre_equipo: { contains: search } },
+      { numero_serie: { contains: search } },
+      { marca: { contains: search } },
+      { modelo: { contains: search } },
+      { ip_equipo: { contains: search } },
+    ];
+  }
 
   const [devices, totalCount] = await prisma.$transaction([
     prisma.device.findMany({
@@ -24,51 +35,48 @@ export const getActiveDevices = async ({ skip, take }) => {
       },
       skip: skip,
       take: take,
-      orderBy: {
-        id: 'desc'
-      }
+      orderBy: { id: 'desc' }
     }),
-    prisma.device.count({
-      where: whereClause,
-    }),
+    prisma.device.count({ where: whereClause }),
   ]);
 
   return { devices, totalCount };
 };
 
-// 👈 CORRECCIÓN: Nueva función para poblar dropdowns
 export const getAllActiveDeviceNames = () =>
   prisma.device.findMany({
     where: {
       estado: {
-        NOT: {
-          nombre: "Baja",
-        },
+        NOT: { nombre: "Baja" },
       },
     },
     select: {
       id: true,
       etiqueta: true,
       nombre_equipo: true,
-      tipo: { // Incluir el tipo para el nombre
-        select: {
-          nombre: true
-        }
-      }
+      tipo: { select: { nombre: true } }
     },
-    orderBy: {
-      etiqueta: 'asc'
-    }
+    orderBy: { etiqueta: 'asc' }
   });
 
-
-// --- getInactiveDevices (Paginada) - Sin cambios ---
-export const getInactiveDevices = async ({ skip, take }) => {
+export const getInactiveDevices = async ({ skip, take, search }) => {
   const whereClause = {
     estado: {
       nombre: "Baja",
     },
   };
+
+  // 👈 CORRECCIÓN: Lógica de búsqueda para bajas
+  if (search) {
+    whereClause.AND = { // Usamos AND para combinar con el estado 'Baja'
+      OR: [
+        { etiqueta: { contains: search } },
+        { nombre_equipo: { contains: search } },
+        { numero_serie: { contains: search } },
+        { motivo_baja: { contains: search } },
+      ]
+    };
+  }
   
   const [devices, totalCount] = await prisma.$transaction([
     prisma.device.findMany({
@@ -82,20 +90,15 @@ export const getInactiveDevices = async ({ skip, take }) => {
       },
       skip: skip,
       take: take,
-      orderBy: {
-        fecha_baja: 'desc'
-      }
+      orderBy: { fecha_baja: 'desc' }
     }),
-    prisma.device.count({
-      where: whereClause,
-    }),
+    prisma.device.count({ where: whereClause }),
   ]);
   
   return { devices, totalCount };
 };
 
-
-// --- Resto de funciones (sin cambios) ---
+// ... (Resto de funciones: getDeviceById, createDevice, etc. SIN CAMBIOS)
 export const getDeviceById = (id) =>
   prisma.device.findUnique({
     where: { id: Number(id) },

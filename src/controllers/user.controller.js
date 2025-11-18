@@ -2,14 +2,14 @@
 import * as userService from "../services/user.service.js";
 import ExcelJS from "exceljs";
 
-// --- getUsers (Paginada) - Sin cambios ---
 export const getUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || ""; // 👈 Capturamos búsqueda
     const skip = (page - 1) * limit;
 
-    const { users, totalCount } = await userService.getUsers({ skip, take: limit });
+    const { users, totalCount } = await userService.getUsers({ skip, take: limit, search });
 
     res.json({
       data: users,
@@ -22,17 +22,16 @@ export const getUsers = async (req, res) => {
   }
 };
 
-// 👈 CORRECCIÓN: Nuevo controlador para dropdowns
+// ... (Resto de funciones: getAllUsers, getUser, etc. SIN CAMBIOS)
 export const getAllUsers = async (req, res) => {
   try {
     const users = await userService.getAllUsers();
-    res.json(users); // Devuelve un array simple
+    res.json(users); 
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// --- Resto de funciones (sin cambios) ---
 export const getUser = async (req, res) => {
   try {
     const user = await userService.getUserById(req.params.id);
@@ -79,7 +78,6 @@ export const exportUsers = async (req, res) => {
     const { users } = await userService.getUsers({ skip: 0, take: undefined }); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Usuarios Crown");
-
     worksheet.columns = [
       { header: "ID", key: "id", width: 10 },
       { header: "Nombre", key: "nombre", width: 30 },
@@ -87,7 +85,6 @@ export const exportUsers = async (req, res) => {
       { header: "Departamento", key: "departamento", width: 25 },
       { header: "Usuario de Login", key: "usuario_login", width: 20 },
     ];
-
     users.forEach((user) => {
       worksheet.addRow({
         id: user.id,
@@ -97,16 +94,9 @@ export const exportUsers = async (req, res) => {
         usuario_login: user.usuario_login || "N/A",
       });
     });
-
     worksheet.getRow(1).font = { bold: true };
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=usuarios_crown.xlsx"
-    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=usuarios_crown.xlsx");
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
