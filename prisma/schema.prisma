@@ -106,6 +106,10 @@ model Maintenance {
   estado            String   @default("pendiente")
   device            Device   @relation(fields: [deviceId], references: [id])
   deviceId          Int
+  
+  diagnostico         String?   @db.Text
+  acciones_realizadas String?   @db.Text
+  observaciones       String?   @db.Text
 
   @@index([deviceId])
 }
