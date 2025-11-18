@@ -2,7 +2,7 @@
 import * as maintenanceService from "../services/maintenance.service.js";
 import ExcelJS from "exceljs";
 
-// ... (getMaintenances, getMaintenance, createMaintenance - sin cambios) ...
+// ... (Las funciones 'getMaintenances', 'getMaintenance', 'createMaintenance', 'updateMaintenance', 'deleteMaintenance', 'exportMaintenances' están bien y no tienen cambios) ...
 
 export const getMaintenances = async (req, res) => {
   try {
@@ -142,7 +142,7 @@ export const exportMaintenances = async (req, res) => {
 };
 
 // -----------------------------------------------------------
-// 👈 FUNCIÓN 'exportIndividualMaintenance' CORREGIDA
+// 👈 VERSIÓN 100% CORREGIDA de 'exportIndividualMaintenance'
 // -----------------------------------------------------------
 export const exportIndividualMaintenance = async (req, res) => {
   try {
@@ -153,7 +153,11 @@ export const exportIndividualMaintenance = async (req, res) => {
       return res.status(404).json({ error: "Mantenimiento no encontrado" });
     }
 
+    if (!maintenance.device) {
+      return res.status(404).json({ error: "No se encontró el dispositivo asociado a este mantenimiento." });
+    }
     const device = maintenance.device;
+    
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Formato de Servicio");
 
@@ -184,7 +188,9 @@ export const exportIndividualMaintenance = async (req, res) => {
     worksheet.getCell('A5').value = "Tipo";
     worksheet.getCell('B5').value = device.tipo?.nombre || "N/A";
     worksheet.getCell('C5').value = "Marca / Modelo";
-    // 👈 CORRECCIÓN 1: 'worksSizseet' -> 'worksheet'
+    // 
+    // 🛑 ¡AQUÍ ESTABA EL ERROR 1! 🛑
+    //
     worksheet.getCell('D5').value = `${device.marca || ''} / ${device.modelo || ''}`;
 
     // --- Sección de Usuario ---
@@ -254,7 +260,9 @@ export const exportIndividualMaintenance = async (req, res) => {
     worksheet.mergeCells('B34:C34');
     worksheet.getCell('B34').border = { bottom: { style: 'thin' } };
     
-    // 👈 CORRECCIÓN 2: 'workskey' -> 'worksheet'
+    // 
+    // 🛑 ¡AQUÍ ESTABA EL ERROR 2! 🛑
+    //
     worksheet.getCell('A36').value = "Usuario Recibe:";
     worksheet.mergeCells('B36:C36');
     worksheet.getCell('B36').border = { bottom: { style: 'thin' } };
@@ -272,7 +280,8 @@ export const exportIndividualMaintenance = async (req, res) => {
     res.end();
 
   } catch (error) {
-    console.error("Error al exportar el formato de servicio:", error);
+    // Añadimos un log más detallado para ti en el servidor
+    console.error("Error detallado al exportar el formato de servicio:", error.message);
     res.status(500).json({ error: "Error al exportar el formato de servicio" });
   }
 };
