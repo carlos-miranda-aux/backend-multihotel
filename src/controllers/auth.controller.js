@@ -1,8 +1,9 @@
+// controllers/auth.controller.js
 import * as authService from "../services/auth.service.js";
 import prisma from "../PrismaClient.js";
 import ExcelJS from "exceljs";
 
-// 📌 Login de usuarios
+// ... (login - sin cambios) ...
 export const login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
@@ -13,17 +14,28 @@ export const login = async (req, res) => {
   }
 };
 
-// 📌 Obtener todos los usuarios
+
+// 👈 CORRECCIÓN: 'getUsers' ahora maneja paginación
 export const getUsers = async (req, res) => {
   try {
-    const users = await authService.getUsers();
-    res.json(users);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { users, totalCount } = await authService.getUsers({ skip, take: limit });
+
+    res.json({
+      data: users,
+      totalCount: totalCount,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit)
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// 東 Obtener un usuario por ID
+// ... (getUser, deleteUser, updateUserController, createUser - sin cambios) ...
 export const getUser = async (req, res) => {
   try {
     const user = await authService.getUserById(req.params.id);
@@ -36,7 +48,6 @@ export const getUser = async (req, res) => {
   }
 };
 
-// 📌 Eliminar usuario
 export const deleteUser = async (req, res) => {
   try {
     const userToDelete = await prisma.userSistema.findUnique({
@@ -55,7 +66,6 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// 📌 Actualizar usuario (nombre, email, rol y/o contraseña)
 export const updateUserController = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -72,7 +82,6 @@ export const updateUserController = async (req, res) => {
   }
 };
 
-// 📌 Crear usuario (para uso de administradores)
 export const createUser = async (req, res) => {
   try {
     const user = await authService.registerUser(req.body);
@@ -82,9 +91,11 @@ export const createUser = async (req, res) => {
   }
 };
 
+
 export const exportSystemUsers = async (req, res) => {
   try {
-    const users = await authService.getUsers(); // Esta función ya excluye contraseñas
+    // 👈 CORRECCIÓN: Exportar no se pagina
+    const { users } = await authService.getUsers({ skip: 0, take: undefined }); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Usuarios del Sistema");
 

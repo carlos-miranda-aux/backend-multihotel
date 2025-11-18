@@ -1,10 +1,11 @@
+// services/auth.service.js
 import prisma from "../PrismaClient.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecreto";
 
-// 🔹 Registrar usuario
+// ... (registerUser, loginUser - sin cambios) ...
 export const registerUser = async (data) => {
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -19,9 +20,7 @@ export const registerUser = async (data) => {
   });
 };
 
-// 🔹 Login (acepta username o email)
 export const loginUser = async ({ identifier, password }) => {
-  // Buscar usuario por username o email
   const user = await prisma.userSistema.findFirst({
     where: {
       OR: [
@@ -42,7 +41,6 @@ export const loginUser = async ({ identifier, password }) => {
     { expiresIn: "60d" }
   );
 
-  // 🔹 Devuelve toda la info necesaria para el frontend y contexto
   return { 
     token, 
     user: { 
@@ -55,18 +53,30 @@ export const loginUser = async ({ identifier, password }) => {
   };
 };
 
-// 🔹 Obtener todos los usuarios
-export const getUsers = () => {
-  return prisma.userSistema.findMany({
-    select: {
-      id: true,
-      username: true,
-      nombre: true,
-      rol: true,
-      email: true,
-      createdAt: true,
-    },
-  });
+// 👈 CORRECCIÓN: 'getUsers' ahora acepta paginación
+export const getUsers = async ({ skip, take }) => {
+  const selectFields = {
+    id: true,
+    username: true,
+    nombre: true,
+    rol: true,
+    email: true,
+    createdAt: true,
+  };
+
+  const [users, totalCount] = await prisma.$transaction([
+    prisma.userSistema.findMany({
+      select: selectFields,
+      skip: skip,
+      take: take,
+      orderBy: {
+        nombre: 'asc'
+      }
+    }),
+    prisma.userSistema.count()
+  ]);
+
+  return { users, totalCount };
 };
 
 export const getUserById = (id) => {
@@ -82,16 +92,14 @@ export const getUserById = (id) => {
   });
 };
 
-// 🔹 Eliminar usuario
 export const deleteUser = (id) => {
   return prisma.userSistema.delete({
     where: { id: Number(id) },
   });
 };
 
-
-// 🔹 Actualizar usuario (nombre, email, rol y/o contraseña)
 export const updateUser = async (id, data) => {
+  // ... (lógica de updateUser sin cambios)
   const { nombre, email, rol, password } = data;
   const updateData = {};
 
@@ -99,12 +107,10 @@ export const updateUser = async (id, data) => {
   if (email) updateData.email = email;
   if (rol) updateData.rol = rol;
 
-  // Si se proporciona una nueva contraseña, la encriptamos
   if (password) {
     updateData.password = await bcrypt.hash(password, 10);
   }
 
-  // Verificar que no se intente cambiar el rol del superadministrador
   const userToUpdate = await prisma.userSistema.findUnique({ where: { id: Number(id) } });
   if (userToUpdate.username === "superadmin" && rol && rol !== userToUpdate.rol) {
     throw new Error("No se puede cambiar el rol del superadministrador");

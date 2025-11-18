@@ -1,16 +1,50 @@
 // src/controllers/maintenance.controller.js
 import * as maintenanceService from "../services/maintenance.service.js";
 import ExcelJS from "exceljs";
-// (Importaciones de email y prisma eliminadas)
 
+// 👈 CORRECCIÓN: 'getMaintenances' con lógica de filtro limpia
 export const getMaintenances = async (req, res) => {
   try {
-    const maintenances = await maintenanceService.getMaintenances();
-    res.json(maintenances);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const statusFilter = req.query.status || null; // 'pendiente' o 'historial'
+    const skip = (page - 1) * limit;
+
+    // 1. Construir la cláusula 'where' aquí
+    const whereClause = {};
+    if (statusFilter === 'pendiente') {
+      whereClause.estado = 'pendiente';
+    } else if (statusFilter === 'historial') {
+      whereClause.estado = {
+        in: ['realizado', 'cancelado']
+      };
+    }
+    // Si statusFilter es null, whereClause es {} y trae todo (paginado)
+
+    // 2. Pasar la cláusula 'where' al servicio
+    const { 
+      maintenances, 
+      totalCount 
+    } = await maintenanceService.getMaintenances({ 
+      skip, 
+      take: limit, 
+      where: whereClause // Pasa el objeto 'where' construido
+    });
+
+    // 3. Devolver la respuesta
+    res.json({
+      data: maintenances,
+      totalCount: totalCount,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit)
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
+// --- EL RESTO DE FUNCIONES (sin cambios) ---
 
 export const getMaintenance = async (req, res) => {
   try {
@@ -22,18 +56,14 @@ export const getMaintenance = async (req, res) => {
   }
 };
 
-// 👇 --- FUNCIÓN REVERTIDA --- 👇
-// (Ya no tiene la lógica de envío de email)
 export const createMaintenance = async (req, res) => {
   try {
     const newMaintenance = await maintenanceService.createMaintenance(req.body);
-    // (Lógica de email eliminada)
     res.status(201).json(newMaintenance);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-// 👆 --- FIN DE LA FUNCIÓN --- 👆
 
 export const updateMaintenance = async (req, res) => {
   try {
@@ -59,7 +89,13 @@ export const deleteMaintenance = async (req, res) => {
 
 export const exportMaintenances = async (req, res) => {
   try {
-    const maintenances = await maintenanceService.getMaintenances(); // Ya incluye el device
+    // Exportar no se pagina, trae todo
+    const { maintenances: allMaintenances } = await maintenanceService.getMaintenances({ 
+      skip: 0, 
+      take: undefined, 
+      where: {} // Trae todos los estados
+    });
+    
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Mantenimientos");
 
@@ -72,7 +108,7 @@ export const exportMaintenances = async (req, res) => {
       { header: "Fecha Realización", key: "fecha_realizacion", width: 20 },
     ];
 
-    maintenances.forEach((m) => {
+    allMaintenances.forEach((m) => {
       worksheet.addRow({
         id: m.id,
         etiqueta: m.device?.etiqueta || "N/A",

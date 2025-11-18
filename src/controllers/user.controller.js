@@ -1,17 +1,38 @@
+// src/controllers/user.controller.js
 import * as userService from "../services/user.service.js";
 import ExcelJS from "exceljs";
 
-// 📌 Obtener todos los usuarios
+// --- getUsers (Paginada) - Sin cambios ---
 export const getUsers = async (req, res) => {
   try {
-    const users = await userService.getUsers();
-    res.json(users);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { users, totalCount } = await userService.getUsers({ skip, take: limit });
+
+    res.json({
+      data: users,
+      totalCount: totalCount,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit)
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// 📌 Obtener un usuario por ID
+// 👈 CORRECCIÓN: Nuevo controlador para dropdowns
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await userService.getAllUsers();
+    res.json(users); // Devuelve un array simple
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// --- Resto de funciones (sin cambios) ---
 export const getUser = async (req, res) => {
   try {
     const user = await userService.getUserById(req.params.id);
@@ -22,7 +43,6 @@ export const getUser = async (req, res) => {
   }
 };
 
-// 📌 Crear un nuevo usuario
 export const createUser = async (req, res) => {
   try {
     const newUser = await userService.createUser(req.body);
@@ -32,7 +52,6 @@ export const createUser = async (req, res) => {
   }
 };
 
-// 📌 Actualizar un usuario
 export const updateUser = async (req, res) => {
   try {
     const oldUser = await userService.getUserById(req.params.id);
@@ -44,7 +63,6 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// 📌 Eliminar un usuario
 export const deleteUser = async (req, res) => {
   try {
     const oldUser = await userService.getUserById(req.params.id);
@@ -58,7 +76,7 @@ export const deleteUser = async (req, res) => {
 
 export const exportUsers = async (req, res) => {
   try {
-    const users = await userService.getUsers(); // Ya incluye el departamento
+    const { users } = await userService.getUsers({ skip: 0, take: undefined }); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Usuarios Crown");
 

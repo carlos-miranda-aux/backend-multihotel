@@ -1,17 +1,43 @@
+// src/services/maintenance.service.js
 import prisma from "../../src/PrismaClient.js";
 
-export const getMaintenances = () =>
-  prisma.maintenance.findMany({
-    include: { device: true },
-  });
+// 👈 CORRECCIÓN: 'getMaintenances' ahora acepta 'where'
+export const getMaintenances = async ({ skip, take, where }) => {
+  
+  const [maintenances, totalCount] = await prisma.$transaction([
+    prisma.maintenance.findMany({
+      where: where, // Usa la cláusula 'where' que viene del controlador
+      include: {
+        device: { // Incluir el dispositivo...
+          select: { // ...pero solo los campos necesarios
+            id: true,
+            etiqueta: true,
+            nombre_equipo: true,
+            numero_serie: true,
+          }
+        }
+      },
+      skip: skip,
+      take: take,
+      orderBy: {
+        fecha_programada: 'desc'
+      }
+    }),
+    prisma.maintenance.count({
+      where: where // Usa la misma cláusula 'where' para contar
+    })
+  ]);
 
-  export const getMaintenanceById = (id) =>
+  return { maintenances, totalCount };
+};
+
+// --- El resto de funciones (sin cambios) ---
+
+export const getMaintenanceById = (id) =>
   prisma.maintenance.findUnique({
     where: { id: Number(id) },
     include: {
-      // Incluir el dispositivo...
       device: {
-        // ...y del dispositivo, incluir sus relaciones
         include: {
           usuario: true,
           departamento: true,
@@ -34,5 +60,3 @@ export const deleteMaintenance = (id) =>
   prisma.maintenance.delete({
     where: { id: Number(id) },
   });
-
-  
