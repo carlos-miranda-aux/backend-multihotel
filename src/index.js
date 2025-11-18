@@ -5,6 +5,7 @@ import prisma from "./PrismaClient.js";
 import bcrypt from "bcryptjs";
 import cron from "node-cron"; 
 import { sendMaintenanceReminder } from "./utils/email.service.js"; 
+import { preloadMasterData } from "./utils/preloadData.js";
 
 // Importar rutas
 import departmentRoutes from "./routes/department.routes.js";
@@ -44,6 +45,8 @@ app.listen(PORT, async () => {
   try {
     await prisma.$connect();
     console.log("Conectado a la BD");
+
+    await preloadMasterData();
 
     const superAdmin = await prisma.userSistema.findFirst({
       where: { username: "superadmin", rol: "ADMIN" }
