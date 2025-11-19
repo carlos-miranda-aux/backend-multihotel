@@ -5,6 +5,7 @@ import {
   getDevice,
   createDevice,
   updateDevice,
+  deleteDevice,
   getAllActiveDeviceNames, // 👈 CORRECCIÓN: Importar
   exportInactiveDevices,
   exportAllDevices
@@ -20,7 +21,7 @@ router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), get
 router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createDevice);
 router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]),updateDevice);
 // (la ruta DELETE ya está comentada, lo cual es correcto)
-
+router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteDevice);
 //Exportar bajas en excel
 router.get("/export/inactivos", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportInactiveDevices);
 router.get("/export/all", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportAllDevices);

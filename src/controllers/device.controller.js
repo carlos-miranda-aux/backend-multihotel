@@ -215,3 +215,23 @@ export const exportAllDevices = async (req, res) => {
     res.status(500).json({ error: "Error al exportar inventario" });
   }
 };
+
+export const deleteDevice = async (req, res) => {
+  try {
+    // 1. Verificar si existe y precargar información
+    const oldDevice = await deviceService.getDeviceById(req.params.id);
+    if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
+
+    // 2. Intenta borrar el dispositivo
+    await deviceService.deleteDevice(req.params.id);
+    
+    res.json({ message: "Dispositivo eliminado" });
+  } catch (error) {
+    console.error("Error al eliminar dispositivo:", error);
+    // 3. Manejar error de llave foránea (equipo con historial)
+    if (error.code === 'P2003') { 
+        return res.status(400).json({ error: "No se puede eliminar el equipo porque tiene registros de mantenimiento asociados. Considere darle de baja." });
+    }
+    res.status(500).json({ error: "Error al eliminar dispositivo" });
+  }
+};
