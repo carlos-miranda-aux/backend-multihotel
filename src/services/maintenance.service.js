@@ -14,6 +14,8 @@ export const getMaintenances = async ({ skip, take, where }) => {
             etiqueta: true,
             nombre_equipo: true,
             numero_serie: true,
+            // 👈 CORRECCIÓN: Incluir el usuario del dispositivo
+            usuario: { select: { nombre: true } }
           }
         }
       },
@@ -36,7 +38,7 @@ export const getMaintenanceById = (id) =>
   prisma.maintenance.findUnique({
     where: { id: Number(id) },
     include: {
-      device: {
+      device: { // Corregido: La relación es Device -> Area -> Departamento
         include: {
           usuario: true,
           area: { // 👈 CORRECCIÓN: Usar la relación 'area'
