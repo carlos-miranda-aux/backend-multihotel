@@ -141,9 +141,9 @@ export const preloadMasterData = async () => {
     if (osCount === 0) {
         console.log("Cargando Sistemas Operativos por defecto...");
         await Promise.all([
-            prisma.operatingSystem.create({ data: { nombre: "Windows 11 Pro" } }),
-            prisma.operatingSystem.create({ data: { nombre: "Windows 10 Pro" } }),
-            prisma.operatingSystem.create({ data: { nombre: "Windows 7 Pro" } }),
+            prisma.operatingSystem.create({ data: { nombre: "Windows 11" } }),
+            prisma.operatingSystem.create({ data: { nombre: "Windows 10" } }),
+            prisma.operatingSystem.create({ data: { nombre: "Windows 7" } }),
             prisma.operatingSystem.create({ data: { nombre: "Windows Server 2019" } }),
         ]);
     }

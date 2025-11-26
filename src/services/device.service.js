@@ -1,13 +1,9 @@
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 
-// ... (Mantén getActiveDevices, getAllActiveDeviceNames, getInactiveDevices, getDeviceById igual) ...
-
+// ... (Funciones CRUD existentes se mantienen igual) ...
 export const getActiveDevices = async ({ skip, take, search }) => {
-  const whereClause = {
-    estado: { NOT: { nombre: "Baja" } },
-  };
-
+  const whereClause = { estado: { NOT: { nombre: "Baja" } } };
   if (search) {
     whereClause.OR = [
       { etiqueta: { contains: search } },
@@ -16,10 +12,9 @@ export const getActiveDevices = async ({ skip, take, search }) => {
       { marca: { contains: search } },
       { modelo: { contains: search } },
       { ip_equipo: { contains: search } },
-      { perfiles_usuario: { contains: search } }, // 👈 Agregamos búsqueda por perfil
+      { perfiles_usuario: { contains: search } },
     ];
   }
-
   const [devices, totalCount] = await prisma.$transaction([
     prisma.device.findMany({
       where: whereClause,
@@ -37,42 +32,34 @@ export const getActiveDevices = async ({ skip, take, search }) => {
     }),
     prisma.device.count({ where: whereClause }),
   ]);
-
   return { devices, totalCount };
 };
 
-// ... (Mantén createDevice, deleteDevice, updateDevice igual, Prisma manejará el nuevo campo automáticamente si se lo pasamos desde el controlador) ...
 export const createDevice = (data) => prisma.device.create({ data });
 export const updateDevice = (id, data) => prisma.device.update({ where: { id: Number(id) }, data });
 export const deleteDevice = (id) => prisma.device.delete({ where: { id: Number(id) } });
-// ... (getDeviceById, getInactiveDevices, getAllActiveDeviceNames también se quedan igual) ...
-export const getDeviceById = (id) =>
-  prisma.device.findUnique({
-    where: { id: Number(id) },
-    include: {
-      usuario: true,
-      tipo: true,
-      estado: true,
-      sistema_operativo: true,
-      area: { include: { departamento: true } },
-    },
-  });
-export const getAllActiveDeviceNames = () =>
-  prisma.device.findMany({
-    where: { estado: { NOT: { nombre: "Baja" } } },
-    select: {
-      id: true,
-      etiqueta: true,
-      nombre_equipo: true,
-      tipo: { select: { nombre: true } }
-    },
-    orderBy: { etiqueta: 'asc' }
-  });
+export const getDeviceById = (id) => prisma.device.findUnique({
+  where: { id: Number(id) },
+  include: {
+    usuario: true,
+    tipo: true,
+    estado: true,
+    sistema_operativo: true,
+    area: { include: { departamento: true } }
+  }
+});
+export const getAllActiveDeviceNames = () => prisma.device.findMany({
+  where: { estado: { NOT: { nombre: "Baja" } } },
+  select: {
+    id: true,
+    etiqueta: true,
+    nombre_equipo: true,
+    tipo: { select: { nombre: true } }
+  },
+  orderBy: { etiqueta: 'asc' }
+});
 export const getInactiveDevices = async ({ skip, take, search }) => {
-  const whereClause = {
-    estado: { nombre: "Baja" },
-  };
-
+  const whereClause = { estado: { nombre: "Baja" } };
   if (search) {
     whereClause.AND = {
       OR: [
@@ -83,7 +70,6 @@ export const getInactiveDevices = async ({ skip, take, search }) => {
       ]
     };
   }
-  
   const [devices, totalCount] = await prisma.$transaction([
     prisma.device.findMany({
       where: whereClause,
@@ -100,102 +86,181 @@ export const getInactiveDevices = async ({ skip, take, search }) => {
     }),
     prisma.device.count({ where: whereClause }),
   ]);
-  
   return { devices, totalCount };
 };
 
-
-// 👇 ACTUALIZACIÓN: IMPORTACIÓN CON CAMPO "PERFILES"
+// --- IMPORTACIÓN CON CREACIÓN DINÁMICA DE DATOS FALTANTES ---
 export const importDevicesFromExcel = async (buffer) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
-  const devicesToCreate = [];
+  const devicesToProcess = [];
   const errors = [];
 
-  const [areas, types, statuses, oss, users] = await Promise.all([
-    prisma.area.findMany(),
-    prisma.deviceType.findMany(),
-    prisma.deviceStatus.findMany(),
-    prisma.operatingSystem.findMany(),
+  // 1. Cargar catálogos existentes
+  const [areas, users] = await Promise.all([
+    prisma.area.findMany({ include: { departamento: true } }),
     prisma.user.findMany(),
   ]);
 
-  const clean = (txt) => txt ? txt.toString().toLowerCase().trim() : "";
-  const areaMap = new Map(areas.map(i => [clean(i.nombre), i.id]));
-  const typeMap = new Map(types.map(i => [clean(i.nombre), i.id]));
-  const statusMap = new Map(statuses.map(i => [clean(i.nombre), i.id]));
-  const osMap = new Map(oss.map(i => [clean(i.nombre), i.id]));
-  const userMap = new Map(users.map(i => [clean(i.nombre), i.id]));
+  const clean = (txt) => txt ? txt.toString().trim() : "";
+  const cleanLower = (txt) => clean(txt).toLowerCase();
 
+  // Mapas de búsqueda rápida
+  const userMap = new Map(users.map(i => [cleanLower(i.nombre), i.id]));
+  const areaMap = new Map();
+  areas.forEach(a => {
+    areaMap.set(`${cleanLower(a.nombre)}|${cleanLower(a.departamento?.nombre)}`, a.id);
+  });
+
+  // 2. Mapear Encabezados
+  const headerMap = {};
+  worksheet.getRow(1).eachCell((cell, colNumber) => {
+    headerMap[cleanLower(cell.value)] = colNumber;
+  });
+
+  // 3. Leer Filas
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
 
-    // Mapeo de Columnas Actualizado:
-    // ... G: Estado, H: Area, I: Responsable (Jefe), J: Perfiles (Lista), K: SO, L: IP, M: Etiqueta, N: Descripcion
+    const getVal = (key) => {
+      const idx = headerMap[key];
+      return idx ? row.getCell(idx).text?.trim() : null;
+    };
+
+    // Extracción de datos
+    const nombreRaw = getVal('nombre equipo');
+    const serieRaw = getVal('n° serie') || getVal('serie') || getVal('numero serie');
     
-    const nombre_equipo = row.getCell(1).text?.trim(); // A
-    const numero_serie = row.getCell(2).text?.trim();  // B
-    const tipoStr = row.getCell(3).text?.trim();       // C
-    const marca = row.getCell(4).text?.trim();         // D
-    const modelo = row.getCell(5).text?.trim();        // E
-    const estadoStr = row.getCell(6).text?.trim();     // F
-    const areaStr = row.getCell(7).text?.trim();       // G
-    const responsableStr = row.getCell(8).text?.trim();// H (Usuario Principal)
-    const perfilesStr = row.getCell(9).text?.trim();   // I 👈 NUEVO: Lista de usuarios extra
-    const osStr = row.getCell(10).text?.trim();        // J
-    const ip_equipo = row.getCell(11).text?.trim();    // K
-    const etiqueta = row.getCell(12).text?.trim();     // L
-    const descripcion = row.getCell(13).text?.trim();  // M
+    // Guardamos los valores crudos (texto) para procesarlos en la inserción
+    const tipoStr = getVal('tipo');
+    const estadoStr = getVal('estado');
+    const osStr = getVal('sistema operativo') || getVal('so'); // 👈 Aquí capturamos el SO
+    
+    const etiqueta = getVal('etiqueta');
+    const marca = getVal('marca') || "Genérico";
+    const modelo = getVal('modelo') || "Genérico";
+    const descripcion = getVal('descripcion') || "Importado masivamente";
+    const ip_equipo = getVal('ip') || getVal('ip equipo');
+    
+    const responsableStr = getVal('responsable (jefe)') || getVal('responsable') || getVal('usuario');
+    const perfilesStr = getVal('perfiles acceso') || getVal('perfiles') || getVal('perfiles de usuario');
+    
+    const areaStr = getVal('área') || getVal('area');
+    const deptoStr = getVal('departamento');
 
-    if (!nombre_equipo || !numero_serie || !tipoStr) {
-      errors.push(`Fila ${rowNumber}: Faltan campos obligatorios.`);
-      return;
+    // Valores por defecto para obligatorios
+    const nombre_equipo = nombreRaw || `Equipo Fila ${rowNumber}`;
+    const numero_serie = serieRaw || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
+
+    // Resolver Usuario (Jefe)
+    const usuarioId = userMap.get(cleanLower(responsableStr)) || null;
+
+    // Resolver Área
+    let areaId = null;
+    if (areaStr && deptoStr) {
+      areaId = areaMap.get(`${cleanLower(areaStr)}|${cleanLower(deptoStr)}`);
+    }
+    if (!areaId && areaStr) {
+      const possibleArea = areas.find(a => cleanLower(a.nombre) === cleanLower(areaStr));
+      if (possibleArea) areaId = possibleArea.id;
     }
 
-    const tipoId = typeMap.get(clean(tipoStr));
-    const estadoId = statusMap.get(clean(estadoStr)) || statusMap.get("activo");
-    const areaId = areaMap.get(clean(areaStr));
-    const sistemaOperativoId = osMap.get(clean(osStr));
-    const usuarioId = userMap.get(clean(responsableStr)); // ID del Jefe/Responsable
-
-    if (!tipoId) {
-        errors.push(`Fila ${rowNumber}: Tipo '${tipoStr}' no encontrado.`);
-        return;
-    }
-
-    devicesToCreate.push({
-      nombre_equipo,
-      numero_serie,
-      tipoId,
-      estadoId,
-      marca: marca || "Genérico",
-      modelo: modelo || "Genérico",
-      etiqueta: etiqueta || null,
-      areaId,
-      usuarioId,
-      perfiles_usuario: perfilesStr || null, // 👈 Guardamos la lista aquí
-      sistemaOperativoId,
-      ip_equipo: ip_equipo || null,
-      descripcion: descripcion || null
+    // Agregamos a la cola de procesamiento con los strings crudos
+    devicesToProcess.push({
+      deviceData: {
+        etiqueta: etiqueta || null,
+        nombre_equipo,
+        numero_serie,
+        marca,
+        modelo,
+        ip_equipo: ip_equipo || null,
+        descripcion,
+        perfiles_usuario: perfilesStr || null,
+        usuarioId,
+        areaId
+      },
+      meta: {
+        tipo: tipoStr || "Estación", // Valor default si viene vacío
+        estado: estadoStr || "Activo", // Valor default si viene vacío
+        os: osStr // Puede venir vacío o con valor
+      }
     });
   });
 
+  // 4. Procesamiento e Inserción (Async)
   let successCount = 0;
-  for (const dev of devicesToCreate) {
+  
+  // Cachés locales para no consultar la BD en cada vuelta si creamos nuevos
+  const typesCache = new Map();
+  const statusCache = new Map();
+  const osCache = new Map();
+
+  // Función auxiliar para buscar o crear catálogos al vuelo
+  const getOrCreateCatalog = async (modelName, value, cache) => {
+    if (!value) return null;
+    const key = cleanLower(value);
+    
+    // 1. Buscar en caché local de esta ejecución
+    if (cache.has(key)) return cache.get(key);
+
+    // 2. Buscar en BD
+    let item = await prisma[modelName].findFirst({ where: { nombre: value } }); // Busca exacto o ajusta a insensitive si prefieres
+    
+    // 3. Si no existe, CREAR
+    if (!item) {
+      try {
+        item = await prisma[modelName].create({ data: { nombre: value } });
+      } catch (e) {
+        // Si falla (ej. condición de carrera), intentar buscar de nuevo
+        item = await prisma[modelName].findFirst({ where: { nombre: value } });
+      }
+    }
+
+    if (item) {
+      cache.set(key, item.id);
+      return item.id;
+    }
+    return null;
+  };
+
+  for (const item of devicesToProcess) {
     try {
-        const exists = await prisma.device.findUnique({ where: { numero_serie: dev.numero_serie } });
-        if (!exists) {
-            await prisma.device.create({ data: dev });
-            successCount++;
-        } else {
-            errors.push(`Serie duplicada: ${dev.numero_serie}`);
-        }
+      // A. Resolver/Crear Tipo
+      const tipoId = await getOrCreateCatalog('deviceType', item.meta.tipo, typesCache);
+      
+      // B. Resolver/Crear Estado
+      const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, statusCache);
+      
+      // C. Resolver/Crear Sistema Operativo (IMPORTANTE: Aquí arreglamos tu problema)
+      const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, osCache);
+
+      const finalData = {
+        ...item.deviceData,
+        tipoId: tipoId, // Si falló la creación (raro), prisma lanzará error, pero tenemos valor default arriba
+        estadoId: estadoId,
+        sistemaOperativoId: sistemaOperativoId // Será null si el Excel no tenía dato, o el ID nuevo si se creó
+      };
+
+      // Upsert por serie
+      const exists = await prisma.device.findUnique({ where: { numero_serie: finalData.numero_serie } });
+      
+      if (!exists) {
+        await prisma.device.create({ data: finalData });
+        successCount++;
+      } else {
+        await prisma.device.update({
+          where: { id: exists.id },
+          data: finalData
+        });
+        successCount++;
+      }
+
     } catch (error) {
-        errors.push(`Error en equipo ${dev.nombre_equipo}: ${error.message}`);
+      errors.push(`Error procesando ${item.deviceData.nombre_equipo}: ${error.message}`);
     }
   }
 
   return { successCount, errors };
-}
+};

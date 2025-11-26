@@ -1,5 +1,6 @@
 // src/routes/devices.routes.js
 import { Router } from "express";
+import multer from "multer";
 import {
   getDevices,
   getDevice,
@@ -8,10 +9,12 @@ import {
   deleteDevice,
   getAllActiveDeviceNames, // 👈 CORRECCIÓN: Importar
   exportInactiveDevices,
-  exportAllDevices
+  exportAllDevices,
+  importDevices
 } from "../controllers/device.controller.js";
 import {verifyRole, verifyToken} from "../middlewares/auth.middleware.js"
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
 router.get("/get",verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevices);
@@ -26,5 +29,6 @@ router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteDevice);
 router.get("/export/inactivos", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportInactiveDevices);
 router.get("/export/all", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportAllDevices);
 
+router.post("/import", verifyToken, verifyRole(["ADMIN"]), upload.single("file"), importDevices);
 
 export default router;

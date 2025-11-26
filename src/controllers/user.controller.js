@@ -115,3 +115,22 @@ export const exportUsers = async (req, res) => {
     res.status(500).json({ error: "Error al exportar usuarios" });
   }
 };
+
+export const importUsers = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No se ha subido ningún archivo." });
+    }
+    
+    const { successCount, errors } = await userService.importUsersFromExcel(req.file.buffer);
+    
+    res.json({ 
+      message: `Proceso finalizado. Insertados: ${successCount}. Errores: ${errors.length}`,
+      errors: errors 
+    });
+
+  } catch (error) {
+    console.error("Error en importación de usuarios:", error);
+    res.status(500).json({ error: "Error interno al procesar el archivo." });
+  }
+};
