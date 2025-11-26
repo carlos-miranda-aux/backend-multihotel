@@ -40,6 +40,12 @@ env
 ```bash
 DATABASE_URL="mysql://usuario:password@localhost:3306/simelan"
 JWT_SECRET="supersecreto"
+
+EMAIL_HOST="smtp.gmail.com"
+EMAIL_PORT=465
+EMAIL_SECURE=true
+EMAIL_USER="email@gmail.com"
+EMAIL_PASS="xxxx xxxx xxxx xxxx"
 ```
 - Cambia usuario, password y 3306 según tu instalación de MySQL.
 - simelan es el nombre de la base de datos (si no existe, Prisma la crea con la migración).
