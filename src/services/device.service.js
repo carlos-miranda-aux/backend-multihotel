@@ -5,7 +5,7 @@ import ExcelJS from "exceljs";
 // SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
 // =====================================================================
 
-export const getActiveDevices = async ({ skip, take, search }) => {
+export const getActiveDevices = async ({ skip, take, search, filter }) => { // 👈 ACEPTA filter
   const whereClause = {
     estado: { NOT: { nombre: "Baja" } },
   };
@@ -20,6 +20,30 @@ export const getActiveDevices = async ({ skip, take, search }) => {
       { ip_equipo: { contains: search } },
       { perfiles_usuario: { contains: search } },
     ];
+  }
+  
+  // 👇 NUEVA LÓGICA DE FILTRADO
+  if (filter === 'no-panda') {
+      whereClause.AND = whereClause.AND || [];
+      whereClause.AND.push({ es_panda: false });
+  } else if (filter === 'warranty-risk') {
+      // Filtrar por equipos cuya garantía finaliza en los próximos 90 días
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); 
+
+      const ninetyDaysFromNow = new Date();
+      ninetyDaysFromNow.setDate(today.getDate() + 90);
+      ninetyDaysFromNow.setHours(23, 59, 59, 999); // Incluir todo el último día
+      
+      whereClause.AND = whereClause.AND || [];
+      whereClause.AND.push({
+          garantia_fin: {
+              // Debe ser mayor o igual a hoy (es decir, aún vigente)
+              gte: today.toISOString(), 
+              // Y menor o igual a 90 días a partir de hoy
+              lte: ninetyDaysFromNow.toISOString() 
+          }
+      });
   }
 
   const [devices, totalCount] = await prisma.$transaction([

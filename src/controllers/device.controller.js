@@ -7,9 +7,11 @@ export const getDevices = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || ""; 
+    const filter = req.query.filter || ""; // 👈 CAPTURAR FILTRO DE URL
     const skip = (page - 1) * limit;
 
-    const { devices, totalCount } = await deviceService.getActiveDevices({ skip, take: limit, search });
+    // 👈 PASAR EL FILTRO AL SERVICIO
+    const { devices, totalCount } = await deviceService.getActiveDevices({ skip, take: limit, search, filter });
     
     res.json({
       data: devices,
