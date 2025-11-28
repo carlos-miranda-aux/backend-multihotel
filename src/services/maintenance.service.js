@@ -14,8 +14,15 @@ export const getMaintenances = async ({ skip, take, where }) => {
             etiqueta: true,
             nombre_equipo: true,
             numero_serie: true,
+            // 👇 NUEVO: Incluir IP
+            ip_equipo: true, // <-- AÑADIDO
             // 👈 Incluir el usuario del dispositivo
-            usuario: { select: { nombre: true } },
+            usuario: { 
+              select: { 
+                nombre: true, 
+                usuario_login: true // <-- AÑADIDO
+              } 
+            },
             // 👇 CORRECCIÓN CLAVE: Incluir Área y su Departamento para el reporte de lista
             area: { 
               select: { 

@@ -320,8 +320,9 @@ export const exportCorrectiveAnalysis = async (req, res) => {
         const analysisData = await deviceService.getExpiredWarrantyAnalysis(startDate, endDate);
         
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("Análisis Garantía/Correctivos");
-
+        // ❌ CORRECCIÓN: Se elimina el carácter '/' del nombre de la hoja
+        const worksheet = workbook.addWorksheet("Análisis Garantía-Correctivos"); 
+        
         // 👈 COLUMNAS EXACTAS SOLICITADAS
         worksheet.columns = [
             { header: "Etiqueta", key: "etiqueta", width: 15 },

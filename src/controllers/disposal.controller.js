@@ -23,7 +23,8 @@ export const getDisposals = async (req, res) => {
   }
 };
 
-// ... (Resto de funciones: getDisposal, updateDisposal, deleteDisposal, exportDisposalsExcel SIN CAMBIOS)
+// ... (Resto de funciones: getDisposal, updateDisposal, deleteDisposal permanecen iguales)
+
 export const getDisposal = async (req, res) => {
   try {
     const disposal = await deviceService.getDeviceById(req.params.id); 
@@ -61,29 +62,47 @@ export const deleteDisposal = async (req, res) => {
 
 export const exportDisposalsExcel = async (req, res) => {
   try {
-    const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined });
+    // Se usa getInactiveDevices del deviceService, que incluye la relación 'usuario'
+    const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }); 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Bajas");
+    const worksheet = workbook.addWorksheet("Bajas de Equipos");
+    
     worksheet.columns = [
       { header: "No", key: "id", width: 10 },
-      { header: "Etiqueta Equipo", key: "etiqueta", width: 20 },
-      { header: "Tipo Equipo", key: "tipo", width: 20 },
-      { header: "Marca", key: "marca", width: 20 },
+      { header: "Etiqueta", key: "etiqueta", width: 15 },
+      { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },
+      { header: "N° Serie", key: "numero_serie", width: 25 },
+      { header: "Marca", key: "marca", width: 15 },
       { header: "Modelo", key: "modelo", width: 20 },
+      { header: "Usuario Asignado", key: "usuario_nombre", width: 30 },
+      { header: "Usuario Login", key: "usuario_login", width: 20 },
+      { header: "IP", key: "ip_equipo", width: 15 },
+      { header: "Tipo", key: "tipo", width: 20 },
       { header: "Motivo", key: "motivo_baja", width: 40 },
       { header: "Observaciones", key: "observaciones_baja", width: 40 }
     ];
+
     devices.forEach((d) => {
       worksheet.addRow({
         id: d.id,
         etiqueta: d.etiqueta || "N/A",
-        tipo: d.tipo?.nombre || "N/A",
+        // Información del equipo
+        nombre_equipo: d.nombre_equipo || "N/A",
+        numero_serie: d.numero_serie || "N/A",
         marca: d.marca || "N/A",
         modelo: d.modelo || "N/A",
+        // Información del usuario asignado
+        usuario_nombre: d.usuario?.nombre || "N/A",
+        usuario_login: d.usuario?.usuario_login || "N/A",
+        // Información de red
+        ip_equipo: d.ip_equipo || "N/A",
+        // Información de la baja
+        tipo: d.tipo?.nombre || "N/A",
         motivo_baja: d.motivo_baja || "",
         observaciones_baja: d.observaciones_baja || ""
       });
     });
+    
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).alignment = { horizontal: "center" };
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

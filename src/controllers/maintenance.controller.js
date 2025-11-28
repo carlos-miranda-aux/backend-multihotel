@@ -121,12 +121,19 @@ export const exportMaintenances = async (req, res) => {
     worksheet.columns = [
       { header: "ID Manto", key: "id", width: 10 },
       { header: "Equipo Etiqueta", key: "etiqueta", width: 20 },
-      { header: "Tipo Mantenimiento", key: "tipo_mantenimiento", width: 25 }, // 👈 NUEVA COLUMNA
-      { header: "Descripción", key: "descripcion", width: 40 },
+      { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },        // <-- NUEVO
+      { header: "N° Serie", key: "numero_serie", width: 25 },            // <-- NUEVO
+      { header: "Usuario Asignado", key: "usuario_nombre", width: 30 }, // <-- NUEVO
+      { header: "Usuario Login", key: "usuario_login", width: 20 }, // <-- NUEVO
+      { header: "IP", key: "ip_equipo", width: 15 },                // <-- NUEVO
+      { header: "Tipo Mantenimiento", key: "tipo_mantenimiento", width: 25 }, 
+      { header: "Descripción Programada", key: "descripcion", width: 40 },
+      { header: "Diagnóstico", key: "diagnostico", width: 40 },          // <-- NUEVO
+      { header: "Acciones Realizadas", key: "acciones", width: 40 },     // <-- NUEVO
+      { header: "Observaciones Adicionales", key: "observaciones", width: 40 }, // <-- NUEVO
       { header: "Estado", key: "estado", width: 15 },
       { header: "Fecha Programada", key: "fecha_programada", width: 20 },
       { header: "Fecha Realización", key: "fecha_realizacion", width: 20 },
-      // 👇 AGREGAR COLUMNAS PARA ÁREA Y DEPARTAMENTO
       { header: "Área", key: "area", width: 20 },
       { header: "Departamento", key: "departamento", width: 20 },
     ];
@@ -135,12 +142,21 @@ export const exportMaintenances = async (req, res) => {
       worksheet.addRow({
         id: m.id,
         etiqueta: m.device?.etiqueta || "N/A",
-        tipo_mantenimiento: m.tipo_mantenimiento || "N/A", // 👈 NUEVO VALOR
+        // Campos de equipo
+        nombre_equipo: m.device?.nombre_equipo || "N/A", 
+        numero_serie: m.device?.numero_serie || "N/A",   
+        usuario_nombre: m.device?.usuario?.nombre || "N/A", 
+        usuario_login: m.device?.usuario?.usuario_login || "N/A", 
+        ip_equipo: m.device?.ip_equipo || "N/A", 
+        // Campos de mantenimiento
+        tipo_mantenimiento: m.tipo_mantenimiento || "N/A", 
         descripcion: m.descripcion || "",
+        diagnostico: m.diagnostico || "N/A",          
+        acciones: m.acciones_realizadas || "N/A", 
+        observaciones: m.observaciones || "N/A",      
         estado: m.estado,
         fecha_programada: m.fecha_programada ? new Date(m.fecha_programada).toLocaleDateString() : "N/A",
         fecha_realizacion: m.fecha_realizacion ? new Date(m.fecha_realizacion).toLocaleDateString() : "N/A",
-        // 👇 AGREGAR DATOS DE ÁREA Y DEPARTAMENTO
         area: m.device?.area?.nombre || "N/A",
         departamento: m.device?.area?.departamento?.nombre || "N/A",
       });
