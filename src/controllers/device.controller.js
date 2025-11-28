@@ -4,15 +4,13 @@ import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
 
 export const getDevices = async (req, res) => {
-// ... (getDevices remains the same)
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || ""; 
-    const filter = req.query.filter || ""; // 👈 CAPTURAR FILTRO DE URL
+    const filter = req.query.filter || ""; 
     const skip = (page - 1) * limit;
 
-    // 👈 PASAR EL FILTRO AL SERVICIO
     const { devices, totalCount } = await deviceService.getActiveDevices({ skip, take: limit, search, filter });
     
     res.json({
@@ -28,7 +26,6 @@ export const getDevices = async (req, res) => {
 };
 
 export const getAllActiveDeviceNames = async (req, res) => {
-// ... (getAllActiveDeviceNames remains the same)
   try {
     const devices = await deviceService.getAllActiveDeviceNames();
     res.json(devices); 
@@ -38,7 +35,6 @@ export const getAllActiveDeviceNames = async (req, res) => {
 };
 
 export const getDevice = async (req, res) => {
-// ... (getDevice remains the same)
   try {
     const device = await deviceService.getDeviceById(req.params.id);
     if (!device) return res.status(404).json({ error: "Dispositivo no encontrado" });
@@ -48,9 +44,7 @@ export const getDevice = async (req, res) => {
   }
 };
 
-// NUEVO: Controller para obtener el estado de Panda para el dashboard (Remains the same)
 export const getPandaStatus = async (req, res) => {
-// ... (getPandaStatus remains the same)
   try {
     const counts = await deviceService.getPandaStatusCounts();
     res.json(counts);
@@ -59,36 +53,53 @@ export const getPandaStatus = async (req, res) => {
   }
 };
 
+// 👇 ESTA ES LA FUNCIÓN QUE USA EL REPORTE DE BAJAS. AHORA ESTÁ CORREGIDA.
 export const exportInactiveDevices = async (req, res) => {
-// ... (exportInactiveDevices remains the same)
   try {
     const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Dispositivos Inactivos");
+    
     worksheet.columns = [
-      { header: "N° Equipo", key: "numero", width: 12 },
-      { header: "Etiqueta", key: "etiqueta", width: 20 },
+      { header: "N°", key: "numero", width: 10 },
+      { header: "Etiqueta", key: "etiqueta", width: 15 },
+      { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },     // 👈 NUEVO
+      { header: "N° Serie", key: "numero_serie", width: 25 },         // 👈 NUEVO
+      { header: "Marca", key: "marca", width: 15 },                   // 👈 NUEVO
+      { header: "Modelo", key: "modelo", width: 20 },                 // 👈 NUEVO
+      { header: "Usuario Asignado", key: "usuario_nombre", width: 30 }, // 👈 NUEVO
+      { header: "Usuario Login", key: "usuario_login", width: 20 },     // 👈 NUEVO
+      { header: "IP", key: "ip_equipo", width: 15 },                    // 👈 NUEVO
       { header: "Tipo", key: "tipo", width: 20 },
-      { header: "Marca", key: "marca", width: 20 },
-      { header: "Modelo", key: "modelo", width: 20 },
       { header: "Área", key: "area", width: 25 }, 
       { header: "Departamento", key: "departamento", width: 25 }, 
       { header: "Motivo", key: "motivo_baja", width: 30 },
-      { header: "Observaciones", key: "observaciones_baja", width: 30 },
+      { header: "Observaciones", key: "observaciones_baja", width: 40 },
     ];
+    
     devices.forEach((device, index) => {
       worksheet.addRow({
         numero: index + 1,
         etiqueta: device.etiqueta || "N/A",
+        // Datos del equipo
+        nombre_equipo: device.nombre_equipo || "N/A",
+        numero_serie: device.numero_serie || "N/A",
+        marca: device.marca || "N/A",
+        modelo: device.modelo || "N/A",
+        // Datos del usuario
+        usuario_nombre: device.usuario?.nombre || "N/A",
+        usuario_login: device.usuario?.usuario_login || "N/A",
+        // Datos técnicos
+        ip_equipo: device.ip_equipo || "N/A",
+        // Datos generales
         tipo: device.tipo?.nombre || "",
-        marca: device.marca || "",
-        modelo: device.modelo || "",
         area: device.area?.nombre || "N/A", 
         departamento: device.area?.departamento?.nombre || "N/A", 
         motivo_baja: device.motivo_baja || "N/A",
         observaciones_baja: device.observaciones_baja || "N/A",
       });
     });
+
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).alignment = { horizontal: "center" };
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -102,7 +113,6 @@ export const exportInactiveDevices = async (req, res) => {
 };
 
 export const deleteDevice = async (req, res) => {
-// ... (deleteDevice remains the same)
   try {
     const oldDevice = await deviceService.getDeviceById(req.params.id);
     if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
@@ -120,7 +130,6 @@ export const deleteDevice = async (req, res) => {
 };
 
 export const importDevices = async (req, res) => {
-// ... (importDevices remains the same)
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No se ha subido ningún archivo." });
@@ -141,7 +150,6 @@ export const importDevices = async (req, res) => {
 
 export const createDevice = async (req, res) => {
   try {
-    // 👈 CAPTURAR LOS NUEVOS CAMPOS DE GARANTÍA
     const { fecha_proxima_revision, garantia_numero_reporte, garantia_notes, ...deviceData } = req.body;
     const estadoActivo = await prisma.deviceStatus.findFirst({ where: { nombre: "Activo" } });
     if (!estadoActivo) return res.status(400).json({ error: 'No existe un estado llamado "Activo" en la base de datos.' });
@@ -155,7 +163,6 @@ export const createDevice = async (req, res) => {
       fecha_proxima_revision: fecha_proxima_revision || null,
       perfiles_usuario: deviceData.perfiles_usuario || null,
       estadoId: estadoActivo.id,
-      // 👈 AÑADIR LOS NUEVOS CAMPOS DE GARANTÍA
       garantia_numero_reporte: garantia_numero_reporte || null,
       garantia_notes: garantia_notes || null,
     };
@@ -186,37 +193,24 @@ export const updateDevice = async (req, res) => {
     
     const dataToUpdate = { ...req.body };
 
-    // --- BLOQUE DE LIMPIEZA DE DATOS ---
-    
-    // 1. Área (Opcional)
     if (dataToUpdate.areaId !== undefined) {
         dataToUpdate.areaId = dataToUpdate.areaId ? Number(dataToUpdate.areaId) : null;
     }
-
-    // 2. Usuario Responsable (Opcional)
     if (dataToUpdate.usuarioId !== undefined) {
         dataToUpdate.usuarioId = dataToUpdate.usuarioId ? Number(dataToUpdate.usuarioId) : null;
     }
-
-    // 3. Sistema Operativo (Opcional)
     if (dataToUpdate.sistemaOperativoId !== undefined) {
         dataToUpdate.sistemaOperativoId = dataToUpdate.sistemaOperativoId ? Number(dataToUpdate.sistemaOperativoId) : null;
     }
-
-    // 4. Tipo y Estado (Obligatorios, pero nos aseguramos que sean números)
     if (dataToUpdate.tipoId) dataToUpdate.tipoId = Number(dataToUpdate.tipoId);
     if (dataToUpdate.estadoId) dataToUpdate.estadoId = Number(dataToUpdate.estadoId);
     
-    // 5. CAMPOS DE GARANTÍA: Convertir "" a null
     if (dataToUpdate.garantia_numero_reporte === "") dataToUpdate.garantia_numero_reporte = null;
     if (dataToUpdate.garantia_notes === "") dataToUpdate.garantia_notes = null;
-
-    // ------------------------------------
     
     const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: "Baja" } });
     const disposedStatusId = disposedStatus?.id;
     
-    // Lógica de baja (se mantiene igual)
     if (oldDevice.estadoId === disposedStatusId && dataToUpdate.estadoId && dataToUpdate.estadoId !== disposedStatusId) {
         return res.status(403).json({ error: "No se puede reactivar un equipo que ya ha sido dado de baja." });
     } else if (oldDevice.estadoId === disposedStatusId) {
@@ -225,8 +219,6 @@ export const updateDevice = async (req, res) => {
         dataToUpdate.fecha_baja = new Date();
     }
     
-    // Lógica de mantenimiento preventivo (Se mantiene igual)
-
     const updatedDevice = await deviceService.updateDevice(deviceId, dataToUpdate);
     res.json(updatedDevice);
   } catch (error) {
@@ -249,14 +241,12 @@ export const exportAllDevices = async (req, res) => {
       { header: "Modelo", key: "modelo", width: 20 },
       { header: "N° Serie", key: "numero_serie", width: 25 },
       { header: "Responsable (Jefe)", key: "usuario", width: 30 },
-      // NUEVA COLUMNA: Usuario de Login
       { header: "Usuario de Login", key: "usuario_login", width: 25 },
       { header: "Perfiles Acceso", key: "perfiles", width: 40 },
       { header: "Área", key: "area", width: 25 },
       { header: "Departamento", key: "departamento", width: 25 },
       { header: "Estado", key: "estado", width: 15 },
       { header: "IP", key: "ip", width: 15 },
-      // COLUMNAS DE SOFTWARE Y GARANTÍA
       { header: "Sistema Operativo", key: "sistema_operativo", width: 25 },
       { header: "Licencia SO", key: "licencia_so", width: 25 },
       { header: "Version Office", key: "office_version", width: 18 },
@@ -264,9 +254,8 @@ export const exportAllDevices = async (req, res) => {
       { header: "N Producto", key: "garantia_numero_producto", width: 25 },
       { header: "Inicio Garantía", key: "garantia_inicio", width: 18 },
       { header: "Fin Garantía", key: "garantia_fin", width: 18 },
-      { header: "N° Reporte Manto", key: "garantia_numero_reporte", width: 25 }, // 👈 NUEVA COLUMNA
-      { header: "Notas de Garantía", key: "garantia_notes", width: 40 },         // 👈 NUEVA COLUMNA
-      // COLUMNA PANDA
+      { header: "N° Reporte Manto", key: "garantia_numero_reporte", width: 25 }, 
+      { header: "Notas de Garantía", key: "garantia_notes", width: 40 },         
       { header: "¿Tiene Panda?", key: "es_panda", width: 15 },
     ];
 
@@ -279,14 +268,12 @@ export const exportAllDevices = async (req, res) => {
         modelo: device.modelo || "",
         numero_serie: device.numero_serie || "",
         usuario: device.usuario?.nombre || "N/A",
-        // NUEVO VALOR: usuario_login
         usuario_login: device.usuario?.usuario_login || "N/A",
         perfiles: device.perfiles_usuario || "",
         area: device.area?.nombre || "N/A",
         departamento: device.area?.departamento?.nombre || "N/A",
         estado: device.estado?.nombre || "N/A",
         ip: device.ip_equipo || "",
-        // MAPEO DE DATOS
         sistema_operativo: device.sistema_operativo?.nombre || "N/A",
         licencia_so: device.licencia_so || "",
         office_version: device.office_version || "",
@@ -294,9 +281,8 @@ export const exportAllDevices = async (req, res) => {
         garantia_numero_producto: device.garantia_numero_producto || "",
         garantia_inicio: device.garantia_inicio ? new Date(device.garantia_inicio).toLocaleDateString() : "",
         garantia_fin: device.garantia_fin ? new Date(device.garantia_fin).toLocaleDateString() : "",
-        garantia_numero_reporte: device.garantia_numero_reporte || "", // 👈 NUEVO VALOR
-        garantia_notes: device.garantia_notes || "",                   // 👈 NUEVO VALOR
-        // VALOR PANDA
+        garantia_numero_reporte: device.garantia_numero_reporte || "",
+        garantia_notes: device.garantia_notes || "",
         es_panda: device.es_panda ? "Sí" : "No",
       });
     });
@@ -313,17 +299,13 @@ export const exportAllDevices = async (req, res) => {
 
 export const exportCorrectiveAnalysis = async (req, res) => {
     try {
-        // Capturar los parámetros de fecha de la query (opcionales)
         const { startDate, endDate } = req.query; 
-
-        // Llamar al servicio con los filtros de fecha
         const analysisData = await deviceService.getExpiredWarrantyAnalysis(startDate, endDate);
         
         const workbook = new ExcelJS.Workbook();
-        // ❌ CORRECCIÓN: Se elimina el carácter '/' del nombre de la hoja
-        const worksheet = workbook.addWorksheet("Análisis Garantía-Correctivos"); 
+        // Nombre corregido sin caracteres inválidos
+        const worksheet = workbook.addWorksheet("Analisis Garantia-Correctivos"); 
         
-        // 👈 COLUMNAS EXACTAS SOLICITADAS
         worksheet.columns = [
             { header: "Etiqueta", key: "etiqueta", width: 15 },
             { header: "Nombre Equipo", key: "nombre_equipo", width: 30 },
@@ -344,7 +326,6 @@ export const exportCorrectiveAnalysis = async (req, res) => {
                 numero_serie: d.numero_serie,
                 marca: d.marca,
                 modelo: d.modelo,
-                // Formatear fechas para Excel
                 garantia_fin: d.garantia_fin ? new Date(d.garantia_fin).toLocaleDateString() : "N/A",
                 daysExpired: d.daysExpired !== null ? d.daysExpired : "N/A",
                 correctiveCount: d.correctiveCount,

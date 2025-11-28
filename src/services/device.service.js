@@ -131,7 +131,8 @@ export const getInactiveDevices = async ({ skip, take, search }) => {
     prisma.device.findMany({
       where: whereClause,
       include: {
-        usuario: true,
+        // Aseguramos que todas las relaciones estén incluidas
+        usuario: true, // <-- DEBE SER TRUE para obtener nombre y login
         tipo: true,
         estado: true,
         sistema_operativo: true,

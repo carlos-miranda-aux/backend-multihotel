@@ -86,12 +86,12 @@ export const exportDisposalsExcel = async (req, res) => {
       worksheet.addRow({
         id: d.id,
         etiqueta: d.etiqueta || "N/A",
-        // Información del equipo
+        // Información del equipo (campos directos y anidados)
         nombre_equipo: d.nombre_equipo || "N/A",
         numero_serie: d.numero_serie || "N/A",
         marca: d.marca || "N/A",
         modelo: d.modelo || "N/A",
-        // Información del usuario asignado
+        // Acceso a la información del usuario asignado
         usuario_nombre: d.usuario?.nombre || "N/A",
         usuario_login: d.usuario?.usuario_login || "N/A",
         // Información de red
