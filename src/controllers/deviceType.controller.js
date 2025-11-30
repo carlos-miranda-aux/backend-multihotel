@@ -1,6 +1,6 @@
 import * as deviceTypeService from "../services/deviceType.service.js";
 
-export const getDeviceTypes = async (req, res) => {
+export const getDeviceTypes = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -26,41 +26,48 @@ export const getDeviceTypes = async (req, res) => {
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit)
     });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
-export const getDeviceType = async (req, res) => {
+export const getDeviceType = async (req, res, next) => {
   try {
     const type = await deviceTypeService.getDeviceTypeById(req.params.id);
     if (!type) return res.status(404).json({ message: "Type not found" });
     res.json(type);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
-export const createDeviceType = async (req, res) => {
+export const createDeviceType = async (req, res, next) => {
   try {
     const type = await deviceTypeService.createDeviceType(req.body);
     res.status(201).json(type);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
-export const updateDeviceType = async (req, res) => {
+export const updateDeviceType = async (req, res, next) => {
   try {
     const oldType = await deviceTypeService.getDeviceTypeById(req.params.id);
     if (!oldType) return res.status(404).json({ message: "Type not found" });
     const type = await deviceTypeService.updateDeviceType(req.params.id, req.body);
     res.json(type);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
-export const deleteDeviceType = async (req, res) => {
+export const deleteDeviceType = async (req, res, next) => {
   try {
     const oldType = await deviceTypeService.getDeviceTypeById(req.params.id);
     if (!oldType) return res.status(404).json({ message: "Type not found" });
     await deviceTypeService.deleteDeviceType(req.params.id);
     res.json({ message: "Type deleted" });
   } catch (error) {
-    if (error.code === 'P2003') return res.status(400).json({ error: "No se puede eliminar porque está en uso." });
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

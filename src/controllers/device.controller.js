@@ -2,20 +2,19 @@
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
+import { DEVICE_STATUS } from "../config/constants.js"; // 👈 CONSTANTE
 
-export const getDevices = async (req, res) => {
+export const getDevices = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || ""; 
     const filter = req.query.filter || ""; 
-    // 👇 Nuevos parámetros de ordenamiento
     const sortBy = req.query.sortBy || "id";
     const order = req.query.order || "desc";
 
     const skip = (page - 1) * limit;
 
-    // Pasamos sortBy y order al servicio
     const { devices, totalCount } = await deviceService.getActiveDevices({ 
         skip, 
         take: limit, 
@@ -33,44 +32,120 @@ export const getDevices = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error); // Es bueno loguear el error real
-    res.status(500).json({ error: "Error al obtener dispositivos" });
+    next(error);
   }
 };
 
-// ... (El resto de funciones se mantienen igual) ...
-// (getAllActiveDeviceNames, getDevice, getPandaStatus, exportInactiveDevices, etc.)
-// Solo asegúrate de copiar el resto del archivo original si no lo modificaste.
-// Por brevedad, aquí solo puse la función que cambia.
-export const getAllActiveDeviceNames = async (req, res) => {
+export const getAllActiveDeviceNames = async (req, res, next) => {
     try {
       const devices = await deviceService.getAllActiveDeviceNames();
       res.json(devices); 
     } catch (error) {
-      res.status(500).json({ error: "Error al obtener lista de dispositivos" });
+      next(error);
     }
 };
   
-export const getDevice = async (req, res) => {
+export const getDevice = async (req, res, next) => {
     try {
         const device = await deviceService.getDeviceById(req.params.id);
         if (!device) return res.status(404).json({ error: "Dispositivo no encontrado" });
         res.json(device);
     } catch (error) {
-        res.status(500).json({ error: "Error al obtener dispositivo" });
+        next(error);
     }
 };
 
-export const getPandaStatus = async (req, res) => {
+export const getPandaStatus = async (req, res, next) => {
     try {
         const counts = await deviceService.getPandaStatusCounts();
         res.json(counts);
     } catch (error) {
-        res.status(500).json({ error: "Error al obtener el estado de Panda" });
+        next(error);
     }
 };
 
-export const exportInactiveDevices = async (req, res) => {
+export const createDevice = async (req, res, next) => {
+    try {
+      const { fecha_proxima_revision, garantia_numero_reporte, garantia_notes, ...deviceData } = req.body;
+      
+      // 👇 USO DE CONSTANTE
+      const estadoActivo = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.ACTIVE } });
+      
+      if (!estadoActivo) return res.status(400).json({ error: `No existe un estado llamado "${DEVICE_STATUS.ACTIVE}" en la base de datos.` });
+  
+      const dataToCreate = {
+        ...deviceData,
+        areaId: deviceData.areaId ? Number(deviceData.areaId) : null,
+        usuarioId: deviceData.usuarioId ? Number(deviceData.usuarioId) : null,
+        tipoId: deviceData.tipoId ? Number(deviceData.tipoId) : null,
+        sistemaOperativoId: deviceData.sistemaOperativoId ? Number(deviceData.sistemaOperativoId) : null,
+        fecha_proxima_revision: fecha_proxima_revision || null,
+        perfiles_usuario: deviceData.perfiles_usuario || null,
+        estadoId: estadoActivo.id,
+        garantia_numero_reporte: garantia_numero_reporte || null,
+        garantia_notes: garantia_notes || null,
+      };
+      const newDevice = await deviceService.createDevice(dataToCreate);
+      
+      if (fecha_proxima_revision) {
+        await prisma.maintenance.create({
+          data: {
+            descripcion: "Revisión preventiva inicial",
+            fecha_programada: new Date(fecha_proxima_revision),
+            estado: "pendiente",
+            deviceId: newDevice.id,
+          }
+        });
+      }
+      res.status(201).json(newDevice);
+    } catch (error) {
+      next(error);
+    }
+};
+
+export const updateDevice = async (req, res, next) => {
+    try {
+      const deviceId = Number(req.params.id);
+      
+      const dataToUpdate = { ...req.body };
+  
+      if (dataToUpdate.areaId !== undefined) {
+          dataToUpdate.areaId = dataToUpdate.areaId ? Number(dataToUpdate.areaId) : null;
+      }
+      if (dataToUpdate.usuarioId !== undefined) {
+          dataToUpdate.usuarioId = dataToUpdate.usuarioId ? Number(dataToUpdate.usuarioId) : null;
+      }
+      if (dataToUpdate.sistemaOperativoId !== undefined) {
+          dataToUpdate.sistemaOperativoId = dataToUpdate.sistemaOperativoId ? Number(dataToUpdate.sistemaOperativoId) : null;
+      }
+      if (dataToUpdate.tipoId) dataToUpdate.tipoId = Number(dataToUpdate.tipoId);
+      if (dataToUpdate.estadoId) dataToUpdate.estadoId = Number(dataToUpdate.estadoId);
+      
+      if (dataToUpdate.garantia_numero_reporte === "") dataToUpdate.garantia_numero_reporte = null;
+      if (dataToUpdate.garantia_notes === "") dataToUpdate.garantia_notes = null;
+      
+      const updatedDevice = await deviceService.updateDevice(deviceId, dataToUpdate);
+      res.json(updatedDevice);
+
+    } catch (error) {
+      next(error);
+    }
+};
+
+export const deleteDevice = async (req, res, next) => {
+    try {
+      const oldDevice = await deviceService.getDeviceById(req.params.id);
+      if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
+  
+      await deviceService.deleteDevice(req.params.id);
+      
+      res.json({ message: "Dispositivo eliminado" });
+    } catch (error) {
+      next(error);
+    }
+};
+
+export const exportInactiveDevices = async (req, res, next) => {
     try {
       const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }); 
       const workbook = new ExcelJS.Workbook();
@@ -119,127 +194,11 @@ export const exportInactiveDevices = async (req, res) => {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Error al exportar dispositivos inactivos" });
+      next(error);
     }
 };
 
-export const deleteDevice = async (req, res) => {
-    try {
-      const oldDevice = await deviceService.getDeviceById(req.params.id);
-      if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
-  
-      await deviceService.deleteDevice(req.params.id);
-      
-      res.json({ message: "Dispositivo eliminado" });
-    } catch (error) {
-      console.error("Error al eliminar dispositivo:", error);
-      if (error.code === 'P2003') { 
-          return res.status(400).json({ error: "No se puede eliminar el equipo porque tiene registros de mantenimiento asociados. Considere darle de baja." });
-      }
-      res.status(500).json({ error: "Error al eliminar dispositivo" });
-    }
-};
-
-export const importDevices = async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No se ha subido ningún archivo." });
-      }
-      
-      const { successCount, errors } = await deviceService.importDevicesFromExcel(req.file.buffer);
-      
-      res.json({ 
-        message: `Importación finalizada. Insertados: ${successCount}. Errores: ${errors.length}`,
-        errors: errors 
-      });
-  
-    } catch (error) {
-      console.error("Error en importación de equipos:", error);
-      res.status(500).json({ error: "Error interno al procesar el archivo Excel." });
-    }
-};
-
-export const createDevice = async (req, res) => {
-    try {
-      const { fecha_proxima_revision, garantia_numero_reporte, garantia_notes, ...deviceData } = req.body;
-      const estadoActivo = await prisma.deviceStatus.findFirst({ where: { nombre: "Activo" } });
-      if (!estadoActivo) return res.status(400).json({ error: 'No existe un estado llamado "Activo" en la base de datos.' });
-  
-      const dataToCreate = {
-        ...deviceData,
-        areaId: deviceData.areaId ? Number(deviceData.areaId) : null,
-        usuarioId: deviceData.usuarioId ? Number(deviceData.usuarioId) : null,
-        tipoId: deviceData.tipoId ? Number(deviceData.tipoId) : null,
-        sistemaOperativoId: deviceData.sistemaOperativoId ? Number(deviceData.sistemaOperativoId) : null,
-        fecha_proxima_revision: fecha_proxima_revision || null,
-        perfiles_usuario: deviceData.perfiles_usuario || null,
-        estadoId: estadoActivo.id,
-        garantia_numero_reporte: garantia_numero_reporte || null,
-        garantia_notes: garantia_notes || null,
-      };
-      const newDevice = await deviceService.createDevice(dataToCreate);
-      
-      if (fecha_proxima_revision) {
-        await prisma.maintenance.create({
-          data: {
-            descripcion: "Revisión preventiva inicial",
-            fecha_programada: new Date(fecha_proxima_revision),
-            estado: "pendiente",
-            deviceId: newDevice.id,
-          }
-        });
-      }
-      res.status(201).json(newDevice);
-    } catch (error) {
-      console.error("Error al crear el dispositivo:", error);
-      res.status(500).json({ error: "Error al crear el dispositivo" });
-    }
-};
-
-export const updateDevice = async (req, res) => {
-    try {
-      const deviceId = Number(req.params.id);
-      const oldDevice = await deviceService.getDeviceById(deviceId);
-      if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
-      
-      const dataToUpdate = { ...req.body };
-  
-      if (dataToUpdate.areaId !== undefined) {
-          dataToUpdate.areaId = dataToUpdate.areaId ? Number(dataToUpdate.areaId) : null;
-      }
-      if (dataToUpdate.usuarioId !== undefined) {
-          dataToUpdate.usuarioId = dataToUpdate.usuarioId ? Number(dataToUpdate.usuarioId) : null;
-      }
-      if (dataToUpdate.sistemaOperativoId !== undefined) {
-          dataToUpdate.sistemaOperativoId = dataToUpdate.sistemaOperativoId ? Number(dataToUpdate.sistemaOperativoId) : null;
-      }
-      if (dataToUpdate.tipoId) dataToUpdate.tipoId = Number(dataToUpdate.tipoId);
-      if (dataToUpdate.estadoId) dataToUpdate.estadoId = Number(dataToUpdate.estadoId);
-      
-      if (dataToUpdate.garantia_numero_reporte === "") dataToUpdate.garantia_numero_reporte = null;
-      if (dataToUpdate.garantia_notes === "") dataToUpdate.garantia_notes = null;
-      
-      const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: "Baja" } });
-      const disposedStatusId = disposedStatus?.id;
-      
-      if (oldDevice.estadoId === disposedStatusId && dataToUpdate.estadoId && dataToUpdate.estadoId !== disposedStatusId) {
-          return res.status(403).json({ error: "No se puede reactivar un equipo que ya ha sido dado de baja." });
-      } else if (oldDevice.estadoId === disposedStatusId) {
-          dataToUpdate.estadoId = disposedStatusId;
-      } else if (dataToUpdate.estadoId === disposedStatusId) {
-          dataToUpdate.fecha_baja = new Date();
-      }
-      
-      const updatedDevice = await deviceService.updateDevice(deviceId, dataToUpdate);
-      res.json(updatedDevice);
-    } catch (error) {
-      console.error("Error al actualizar dispositivo:", error);
-      res.status(500).json({ error: "Error al actualizar dispositivo" });
-    }
-};
-
-export const exportAllDevices = async (req, res) => {
+export const exportAllDevices = async (req, res, next) => {
     try {
       const { devices } = await deviceService.getActiveDevices({ skip: 0, take: undefined });
       const workbook = new ExcelJS.Workbook();
@@ -304,12 +263,29 @@ export const exportAllDevices = async (req, res) => {
       await workbook.xlsx.write(res);
       res.end();
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Error al exportar inventario" });
+      next(error);
     }
 };
 
-export const exportCorrectiveAnalysis = async (req, res) => {
+export const importDevices = async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se ha subido ningún archivo." });
+      }
+      
+      const { successCount, errors } = await deviceService.importDevicesFromExcel(req.file.buffer);
+      
+      res.json({ 
+        message: `Importación finalizada. Insertados: ${successCount}. Errores: ${errors.length}`,
+        errors: errors 
+      });
+  
+    } catch (error) {
+      next(error);
+    }
+};
+
+export const exportCorrectiveAnalysis = async (req, res, next) => {
     try {
         const { startDate, endDate } = req.query; 
         const analysisData = await deviceService.getExpiredWarrantyAnalysis(startDate, endDate);
@@ -351,7 +327,6 @@ export const exportCorrectiveAnalysis = async (req, res) => {
         res.end();
 
     } catch (error) {
-        console.error("Error al exportar el análisis:", error);
-        res.status(500).json({ error: "Error al exportar el análisis de garantía y correctivos." });
+        next(error);
     }
 };

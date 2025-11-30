@@ -2,14 +2,13 @@
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 
-export const getDisposals = async (req, res) => {
+export const getDisposals = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || ""; // 👈 Capturamos búsqueda
+    const search = req.query.search || ""; 
     const skip = (page - 1) * limit;
 
-    // Llamamos al servicio de 'device' actualizado con 'search'
     const { devices, totalCount } = await deviceService.getInactiveDevices({ skip, take: limit, search });
     
     res.json({
@@ -19,23 +18,21 @@ export const getDisposals = async (req, res) => {
       totalPages: Math.ceil(totalCount / limit)
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-// ... (Resto de funciones: getDisposal, updateDisposal, deleteDisposal permanecen iguales)
-
-export const getDisposal = async (req, res) => {
+export const getDisposal = async (req, res, next) => {
   try {
     const disposal = await deviceService.getDeviceById(req.params.id); 
     if (!disposal) return res.status(404).json({ error: "Baja no encontrada" });
     res.json(disposal);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const updateDisposal = async (req, res) => {
+export const updateDisposal = async (req, res, next) => {
   try {
     const oldDisposal = await deviceService.getDeviceById(req.params.id);
     if (!oldDisposal) return res.status(404).json({ message: "Disposal not found" });
@@ -48,21 +45,20 @@ export const updateDisposal = async (req, res) => {
     const disposal = await deviceService.updateDevice(req.params.id, dataToUpdate);
     res.json(disposal);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const deleteDisposal = async (req, res) => {
+export const deleteDisposal = async (req, res, next) => {
   try {
     res.status(403).json({ error: "Las bajas no se pueden eliminar, es un registro permanente." });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const exportDisposalsExcel = async (req, res) => {
+export const exportDisposalsExcel = async (req, res, next) => {
   try {
-    // Se usa getInactiveDevices del deviceService, que incluye la relación 'usuario'
     const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Bajas de Equipos");
@@ -86,17 +82,13 @@ export const exportDisposalsExcel = async (req, res) => {
       worksheet.addRow({
         id: d.id,
         etiqueta: d.etiqueta || "N/A",
-        // Información del equipo (campos directos y anidados)
         nombre_equipo: d.nombre_equipo || "N/A",
         numero_serie: d.numero_serie || "N/A",
         marca: d.marca || "N/A",
         modelo: d.modelo || "N/A",
-        // Acceso a la información del usuario asignado
         usuario_nombre: d.usuario?.nombre || "N/A",
         usuario_login: d.usuario?.usuario_login || "N/A",
-        // Información de red
         ip_equipo: d.ip_equipo || "N/A",
-        // Información de la baja
         tipo: d.tipo?.nombre || "N/A",
         motivo_baja: d.motivo_baja || "",
         observaciones_baja: d.observaciones_baja || ""
@@ -110,6 +102,6 @@ export const exportDisposalsExcel = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
-};
+};  

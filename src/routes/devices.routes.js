@@ -12,21 +12,35 @@ import {
   exportAllDevices,
   importDevices,
   exportCorrectiveAnalysis,
-  getPandaStatus // 👈 Se mantiene
+  getPandaStatus
 } from "../controllers/device.controller.js";
-import {verifyRole, verifyToken} from "../middlewares/auth.middleware.js"
+import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
+// 👇 IMPORTAMOS LOS VALIDADORES
+import { validateCreateDevice, validateUpdateDevice } from "../validators/device.validator.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
-router.get("/get",verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevices);
-// Rutas específicas deben ir primero para evitar conflicto con :id
+router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevices);
 router.get("/get/all-names", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getAllActiveDeviceNames);
 router.get("/get/panda-status", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getPandaStatus); 
-router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevice); // 👈 Esta debe ser la última ruta /get
+router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevice);
 
-router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createDevice);
-router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]),updateDevice);
+// 👇 APLICAMOS MIDDLEWARE DE VALIDACIÓN ANTES DEL CONTROLADOR
+router.post("/post", 
+    verifyToken, 
+    verifyRole(["ADMIN", "EDITOR"]), 
+    validateCreateDevice, // <--- Valida aquí
+    createDevice
+);
+
+router.put("/put/:id", 
+    verifyToken, 
+    verifyRole(["ADMIN", "EDITOR"]), 
+    validateUpdateDevice, // <--- Valida aquí
+    updateDevice
+);
+
 router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteDevice);
 router.get("/export/inactivos", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportInactiveDevices);
 router.get("/export/all", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportAllDevices);

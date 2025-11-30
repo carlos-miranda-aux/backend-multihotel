@@ -1,21 +1,26 @@
 // src/controllers/maintenance.controller.js
 import * as maintenanceService from "../services/maintenance.service.js";
 import ExcelJS from "exceljs";
+import { MAINTENANCE_STATUS } from "../config/constants.js"; // 👈 CONSTANTE
 
-export const getMaintenances = async (req, res) => {
+export const getMaintenances = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const statusFilter = req.query.status || null;
     const search = req.query.search || "";
-    // 👇 Nuevos params
     const sortBy = req.query.sortBy || "fecha_programada";
     const order = req.query.order || "desc";
     
     const skip = (page - 1) * limit;
     const whereClause = {};
-    if (statusFilter === 'pendiente') whereClause.estado = 'pendiente';
-    else if (statusFilter === 'historial') whereClause.estado = { in: ['realizado', 'cancelado'] };
+    
+    // 👇 USO DE CONSTANTES
+    if (statusFilter === MAINTENANCE_STATUS.PENDING) {
+        whereClause.estado = MAINTENANCE_STATUS.PENDING;
+    } else if (statusFilter === 'historial') {
+        whereClause.estado = { in: [MAINTENANCE_STATUS.COMPLETED, MAINTENANCE_STATUS.CANCELLED] };
+    }
 
     if (search) {
       whereClause.AND = {
@@ -31,42 +36,44 @@ export const getMaintenances = async (req, res) => {
       skip, 
       take: limit, 
       where: whereClause,
-      sortBy, // 👈 Pasamos
+      sortBy, 
       order 
     });
 
     res.json({ data: maintenances, totalCount: totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
-export const getMaintenance = async (req, res) => {
+export const getMaintenance = async (req, res, next) => {
   try {
     const maintenance = await maintenanceService.getMaintenanceById(req.params.id);
     if (!maintenance) return res.status(404).json({ message: "Maintenance not found" });
     res.json(maintenance);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const createMaintenance = async (req, res) => {
+export const createMaintenance = async (req, res, next) => {
   try {
-    // 👈 El service espera el cuerpo completo (incluyendo tipo_mantenimiento)
     const newMaintenance = await maintenanceService.createMaintenance(req.body);
     res.status(201).json(newMaintenance);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const updateMaintenance = async (req, res) => {
+export const updateMaintenance = async (req, res, next) => {
   try {
     const oldMaintenance = await maintenanceService.getMaintenanceById(req.params.id);
     if (!oldMaintenance) return res.status(404).json({ message: "Maintenance not found" });
 
     let dataToUpdate = { ...req.body };
 
-    if (dataToUpdate.estado === 'pendiente') {
+    // 👇 USO DE CONSTANTE
+    if (dataToUpdate.estado === MAINTENANCE_STATUS.PENDING) {
       dataToUpdate.diagnostico = null;
       dataToUpdate.acciones_realizadas = null;
       dataToUpdate.observaciones = null;
@@ -76,29 +83,29 @@ export const updateMaintenance = async (req, res) => {
     const updatedMaintenance = await maintenanceService.updateMaintenance(req.params.id, dataToUpdate);
     res.json(updatedMaintenance);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
 
-export const deleteMaintenance = async (req, res) => {
+export const deleteMaintenance = async (req, res, next) => {
   try {
     const oldMaintenance = await maintenanceService.getMaintenanceById(req.params.id);
     if (!oldMaintenance) return res.status(404).json({ message: "Maintenance not found" });
 
-    // 👇 CORRECCIÓN: Evitar la eliminación si el mantenimiento ya está en historial
-    if (oldMaintenance.estado === 'realizado' || oldMaintenance.estado === 'cancelado') {
-      return res.status(403).json({ message: "No se puede eliminar un mantenimiento que ya forma parte del historial (realizado o cancelado)." });
+    // 👇 USO DE CONSTANTES
+    if (oldMaintenance.estado === MAINTENANCE_STATUS.COMPLETED || oldMaintenance.estado === MAINTENANCE_STATUS.CANCELLED) {
+      return res.status(403).json({ message: "No se puede eliminar un mantenimiento que ya forma parte del historial." });
     }
 
     await maintenanceService.deleteMaintenance(req.params.id);
     res.json({ message: "Maintenance deleted" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const exportMaintenances = async (req, res) => {
+export const exportMaintenances = async (req, res, next) => {
   try {
     const { maintenances: allMaintenances } = await maintenanceService.getMaintenances({ 
       skip: 0, 
@@ -112,16 +119,16 @@ export const exportMaintenances = async (req, res) => {
     worksheet.columns = [
       { header: "ID Manto", key: "id", width: 10 },
       { header: "Equipo Etiqueta", key: "etiqueta", width: 20 },
-      { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },        // <-- NUEVO
-      { header: "N° Serie", key: "numero_serie", width: 25 },            // <-- NUEVO
-      { header: "Usuario Asignado", key: "usuario_nombre", width: 30 }, // <-- NUEVO
-      { header: "Usuario Login", key: "usuario_login", width: 20 }, // <-- NUEVO
-      { header: "IP", key: "ip_equipo", width: 15 },                // <-- NUEVO
+      { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },        
+      { header: "N° Serie", key: "numero_serie", width: 25 },            
+      { header: "Usuario Asignado", key: "usuario_nombre", width: 30 }, 
+      { header: "Usuario Login", key: "usuario_login", width: 20 }, 
+      { header: "IP", key: "ip_equipo", width: 15 },                
       { header: "Tipo Mantenimiento", key: "tipo_mantenimiento", width: 25 }, 
       { header: "Descripción Programada", key: "descripcion", width: 40 },
-      { header: "Diagnóstico", key: "diagnostico", width: 40 },          // <-- NUEVO
-      { header: "Acciones Realizadas", key: "acciones", width: 40 },     // <-- NUEVO
-      { header: "Observaciones Adicionales", key: "observaciones", width: 40 }, // <-- NUEVO
+      { header: "Diagnóstico", key: "diagnostico", width: 40 },          
+      { header: "Acciones Realizadas", key: "acciones", width: 40 },     
+      { header: "Observaciones Adicionales", key: "observaciones", width: 40 }, 
       { header: "Estado", key: "estado", width: 15 },
       { header: "Fecha Programada", key: "fecha_programada", width: 20 },
       { header: "Fecha Realización", key: "fecha_realizacion", width: 20 },
@@ -133,13 +140,11 @@ export const exportMaintenances = async (req, res) => {
       worksheet.addRow({
         id: m.id,
         etiqueta: m.device?.etiqueta || "N/A",
-        // Campos de equipo
         nombre_equipo: m.device?.nombre_equipo || "N/A", 
         numero_serie: m.device?.numero_serie || "N/A",   
         usuario_nombre: m.device?.usuario?.nombre || "N/A", 
         usuario_login: m.device?.usuario?.usuario_login || "N/A", 
         ip_equipo: m.device?.ip_equipo || "N/A", 
-        // Campos de mantenimiento
         tipo_mantenimiento: m.tipo_mantenimiento || "N/A", 
         descripcion: m.descripcion || "",
         diagnostico: m.diagnostico || "N/A",          
@@ -159,12 +164,11 @@ export const exportMaintenances = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error al exportar mantenimientos" });
+    next(error);
   }
 };
 
-export const exportIndividualMaintenance = async (req, res) => {
+export const exportIndividualMaintenance = async (req, res, next) => {
   try {
     const { id } = req.params;
     const maintenance = await maintenanceService.getMaintenanceById(id);
@@ -212,21 +216,20 @@ export const exportIndividualMaintenance = async (req, res) => {
     worksheet.getCell('A8').value = "Usuario Asignado";
     worksheet.getCell('B8').value = device.usuario?.nombre || "No asignado";
     worksheet.getCell('C8').value = "Área"; 
-    worksheet.getCell('D8').value = device.area?.nombre || "N/A"; // Área
+    worksheet.getCell('D8').value = device.area?.nombre || "N/A"; 
 
     worksheet.getCell('A9').value = "Departamento";
     worksheet.mergeCells('B9:D9'); 
-    worksheet.getCell('B9').value = device.area?.departamento?.nombre || "N/A"; // Departamento
+    worksheet.getCell('B9').value = device.area?.departamento?.nombre || "N/A"; 
 
-    // Re-indexar todas las filas siguientes sumando 1 al número de fila anterior:
     worksheet.mergeCells('A11:D11'); 
     const mantoTitle = worksheet.getCell('A11');
     mantoTitle.value = "Detalles del Servicio";
     mantoTitle.font = { bold: true };
     mantoTitle.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFD3D3D3'} };
 
-    worksheet.getCell('A12').value = "Tipo"; // 👈 NUEVA FILA
-    worksheet.getCell('B12').value = maintenance.tipo_mantenimiento || 'N/A'; // 👈 NUEVO VALOR
+    worksheet.getCell('A12').value = "Tipo"; 
+    worksheet.getCell('B12').value = maintenance.tipo_mantenimiento || 'N/A'; 
     worksheet.getCell('C12').value = "Estado";
     worksheet.getCell('D12').value = maintenance.estado;
     
@@ -284,7 +287,6 @@ export const exportIndividualMaintenance = async (req, res) => {
     res.end();
 
   } catch (error) {
-    console.error("Error detallado al exportar el formato de servicio:", error.message);
-    res.status(500).json({ error: "Error al exportar el formato de servicio" });
+    next(error);
   }
 };

@@ -1,6 +1,6 @@
 import * as areaService from "../services/area.service.js";
 
-export const getAreas = async (req, res) => {
+export const getAreas = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -30,44 +30,43 @@ export const getAreas = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const getArea = async (req, res) => {
+export const getArea = async (req, res, next) => {
   try {
     const area = await areaService.getAreaById(req.params.id);
     if (!area) return res.status(404).json({ message: "Area not found" });
     res.json(area);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
-export const createArea = async (req, res) => {
+export const createArea = async (req, res, next) => {
   try {
     const area = await areaService.createArea(req.body);
     res.status(201).json(area);
   } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ error: "Nombre duplicado." });
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const updateArea = async (req, res) => {
+export const updateArea = async (req, res, next) => {
   try {
     const area = await areaService.updateArea(req.params.id, req.body);
     res.json(area);
   } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ error: "Nombre duplicado." });
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const deleteArea = async (req, res) => {
+export const deleteArea = async (req, res, next) => {
   try {
     await areaService.deleteArea(req.params.id);
     res.json({ message: "Area deleted" });
   } catch (error) {
-    if (error.code === 'P2003') return res.status(400).json({ error: "Área en uso." });
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

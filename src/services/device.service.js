@@ -2,6 +2,7 @@
 
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
+import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js"; // 👈 CONSTANTES
 
 // =====================================================================
 // SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
@@ -9,7 +10,7 @@ import ExcelJS from "exceljs";
 
 export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }) => { 
   const whereClause = {
-    estado: { NOT: { nombre: "Baja" } },
+    estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
   };
 
   if (search) {
@@ -21,11 +22,10 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
       { modelo: { contains: search } },
       { ip_equipo: { contains: search } },
       { perfiles_usuario: { contains: search } },
-      { comentarios: { contains: search } }, // 👈 AÑADIDO: Búsqueda en comentarios
+      { comentarios: { contains: search } },
     ];
   }
   
-  // 👇 LÓGICA DE FILTRADO
   const today = new Date();
   today.setHours(0, 0, 0, 0); 
   const ninetyDaysFromNow = new Date(today);
@@ -53,7 +53,6 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
       });
   }
 
-  // 👇 LÓGICA DE ORDENAMIENTO DINÁMICO
   let orderByClause = {};
   if (sortBy) {
       if (sortBy.includes('.')) {
@@ -89,16 +88,32 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
 
 export const createDevice = (data) => prisma.device.create({ data });
 
-export const updateDevice = (id, data) =>
-  prisma.device.update({
-    where: { id: Number(id) },
+export const updateDevice = async (id, data) => {
+  const deviceId = Number(id);
+  const oldDevice = await prisma.device.findUnique({ where: { id: deviceId } });
+  if (!oldDevice) throw new Error("Dispositivo no encontrado");
+
+  // 👇 USO DE CONSTANTE
+  const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.DISPOSED } });
+  const disposedStatusId = disposedStatus?.id;
+
+  if (disposedStatusId) {
+    if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
+        throw new Error("No se puede reactivar un equipo que ya ha sido dado de baja.");
+    } else if (oldDevice.estadoId === disposedStatusId) {
+        data.estadoId = disposedStatusId;
+    } else if (data.estadoId === disposedStatusId) {
+        data.fecha_baja = new Date();
+    }
+  }
+
+  return prisma.device.update({
+    where: { id: deviceId },
     data,
   });
+};
 
-export const deleteDevice = (id) =>
-  prisma.device.delete({
-    where: { id: Number(id) },
-  });
+export const deleteDevice = (id) => prisma.device.delete({ where: { id: Number(id) } });
 
 export const getDeviceById = (id) =>
   prisma.device.findUnique({
@@ -114,7 +129,8 @@ export const getDeviceById = (id) =>
 
 export const getAllActiveDeviceNames = () =>
   prisma.device.findMany({
-    where: { estado: { NOT: { nombre: "Baja" } } },
+    // 👇 USO DE CONSTANTE
+    where: { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } },
     select: {
       id: true,
       etiqueta: true,
@@ -126,7 +142,8 @@ export const getAllActiveDeviceNames = () =>
 
 export const getInactiveDevices = async ({ skip, take, search }) => {
   const whereClause = {
-    estado: { nombre: "Baja" },
+    // 👇 USO DE CONSTANTE
+    estado: { nombre: DEVICE_STATUS.DISPOSED },
   };
 
   if (search) {
@@ -162,12 +179,13 @@ export const getInactiveDevices = async ({ skip, take, search }) => {
 
 export const getPandaStatusCounts = async () => {
     const totalActiveDevices = await prisma.device.count({
-        where: { estado: { NOT: { nombre: "Baja" } } }
+        // 👇 USO DE CONSTANTE
+        where: { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } }
     });
 
     const devicesWithPanda = await prisma.device.count({
         where: {
-            estado: { NOT: { nombre: "Baja" } },
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
             es_panda: true
         }
     });
@@ -177,7 +195,7 @@ export const getPandaStatusCounts = async () => {
 
     const expiredWarrantiesCount = await prisma.device.count({
         where: {
-            estado: { NOT: { nombre: "Baja" } },
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
             garantia_fin: { lt: today.toISOString() }
         }
     });
@@ -192,156 +210,24 @@ export const getPandaStatusCounts = async () => {
     };
 };
 
-export const importDevicesFromExcel = async (buffer) => {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
-  const worksheet = workbook.getWorksheet(1);
+// =====================================================================
+// SECCIÓN 2: HELPERS PARA IMPORTACIÓN
+// =====================================================================
 
-  const devicesToProcess = [];
-  const errors = [];
+const clean = (txt) => txt ? txt.toString().trim() : "";
+const cleanLower = (txt) => clean(txt).toLowerCase();
 
-  const [areas, users] = await Promise.all([
-    prisma.area.findMany({ include: { departamento: true } }),
-    prisma.user.findMany(),
-  ]);
-
-  const clean = (txt) => txt ? txt.toString().trim() : "";
-  const cleanLower = (txt) => clean(txt).toLowerCase();
-
-  const userLoginMap = new Map(users
-    .filter(i => i.usuario_login) 
-    .map(i => [cleanLower(i.usuario_login), i.id])
-  );
-  const userNameMap = new Map(users.map(i => [cleanLower(i.nombre), i.id]));
-  
-  const areaMap = new Map();
-  areas.forEach(a => {
-    areaMap.set(`${cleanLower(a.nombre)}|${cleanLower(a.departamento?.nombre)}`, a.id);
-  });
-
-  const headerMap = {};
-  worksheet.getRow(1).eachCell((cell, colNumber) => {
-    headerMap[cleanLower(cell.value)] = colNumber;
-  });
-  
-  const parseDateForPrisma = (dateStr) => {
-      if (!dateStr) return null;
-      try {
-          const date = new Date(dateStr);
-          return isNaN(date.getTime()) ? null : date.toISOString();
-      } catch (e) {
-          return null;
-      }
-  };
-
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-
-    const getVal = (key) => {
-      const idx = headerMap[key];
-      return idx ? row.getCell(idx).text?.trim() : null;
-    };
-
-    const etiqueta = getVal('etiqueta');
-    
-    const nombreRaw = getVal('nombre equipo') || getVal('nombre');
-    const serieRaw = getVal('n° serie') || getVal('serie') || getVal('numero serie') || getVal('serial');
-    
-    const tipoStr = getVal('tipo');
-    const estadoStr = getVal('estado');
-    
-    const rawOS = getVal('sistema operativo') || getVal('so') || getVal('os');
-    let osStr = null;
-    if (rawOS) {
-        const trimmed = rawOS.trim().toLowerCase();
-        osStr = trimmed.charAt(0).toUpperCase() + trimmed.slice(1); 
+const parseExcelDate = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+        const date = new Date(dateStr);
+        return isNaN(date.getTime()) ? null : date.toISOString();
+    } catch (e) {
+        return null;
     }
+};
 
-    const marca = getVal('marca') || "Genérico";
-    const modelo = getVal('modelo') || "Genérico";
-    
-    const ip_equipo_raw = getVal('ip') || getVal('ip equipo');
-    const ip_equipo = ip_equipo_raw || "DHCP";
-    
-    const descripcion = getVal('descripcion') || ""; 
-    // 👇 NUEVO: Importar comentarios
-    const comentarios = getVal('comentarios') || getVal('observaciones') || getVal('notas');
-    
-    const officeVersionStr = getVal('version office') || getVal('office version') || getVal('version de office') || getVal('office versión');
-    const officeLicenseTypeStr = getVal('tipo licencia') || getVal('tipo de licencia') || getVal('licencia office') || getVal('tipo licencia office') || getVal('tipo de licencia office');
-    
-    const garantiaNumProdStr = getVal('n producto') || getVal('garantia numero producto') || getVal('numero de producto de garantia') || getVal('garantia numero');
-    const garantiaInicioStr = getVal('inicio garantia') || getVal('garantia inicio');
-    const garantiaFinStr = getVal('fin garantia') || getVal('garantia fin');
-
-    const pandaStr = getVal('antivirus') || getVal('panda') || getVal('es panda');
-    const es_panda = cleanLower(pandaStr) === "si" || cleanLower(pandaStr) === "yes" || cleanLower(pandaStr) === "verdadero" || cleanLower(pandaStr) === "true";
-
-    const responsableLoginStr = getVal('usuario de login') || getVal('usuario login') || getVal('login') || getVal('usuarios') || getVal('usuario');
-    const responsableNameStr = getVal('responsable (jefe') || getVal('responsable');
-    
-    const perfilesStr = getVal('perfiles acceso') || getVal('perfiles') || getVal('perfiles de usuario');
-    
-    const areaStr = getVal('área') || getVal('area');
-    const deptoStr = getVal('departamento');
-
-    const nombre_equipo = nombreRaw || `Equipo Fila ${rowNumber}`;
-    const numero_serie = serieRaw || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
-
-    let usuarioId = null;
-    
-    if (responsableLoginStr) {
-        usuarioId = userLoginMap.get(cleanLower(responsableLoginStr));
-    }
-    
-    if (!usuarioId && responsableNameStr) {
-        usuarioId = userNameMap.get(cleanLower(responsableNameStr));
-    }
-
-    let areaId = null;
-    if (areaStr && deptoStr) {
-      areaId = areaMap.get(`${cleanLower(areaStr)}|${cleanLower(deptoStr)}`);
-    }
-    if (!areaId && areaStr) {
-      const possibleArea = areas.find(a => cleanLower(a.nombre) === cleanLower(areaStr));
-      if (possibleArea) areaId = possibleArea.id;
-    }
-
-    devicesToProcess.push({
-      deviceData: {
-        etiqueta: etiqueta || null,
-        nombre_equipo,
-        numero_serie,
-        marca,
-        modelo,
-        ip_equipo: ip_equipo,
-        descripcion, 
-        comentarios: comentarios || null, // 👈 Se guarda aquí
-        perfiles_usuario: perfilesStr || null,
-        usuarioId, 
-        areaId,
-        office_version: officeVersionStr || null,
-        office_tipo_licencia: officeLicenseTypeStr || null,
-        garantia_numero_producto: garantiaNumProdStr || null,
-        garantia_inicio: parseDateForPrisma(garantiaInicioStr),
-        garantia_fin: parseDateForPrisma(garantiaFinStr),
-        es_panda: es_panda, 
-      },
-      meta: {
-        tipo: tipoStr || "Estación",
-        estado: estadoStr || "Activo",
-        os: osStr
-      }
-    });
-  });
-
-  let successCount = 0;
-  
-  const typesCache = new Map();
-  const statusCache = new Map();
-  const osCache = new Map();
-
-  const getOrCreateCatalog = async (modelName, value, cache) => {
+const getOrCreateCatalog = async (modelName, value, cache) => {
     if (!value) return null;
     const key = cleanLower(value);
     
@@ -362,36 +248,170 @@ export const importDevicesFromExcel = async (buffer) => {
       return item.id;
     }
     return null;
+};
+
+const extractRowData = (row, headerMap) => {
+    const getVal = (key) => {
+        const idx = headerMap[key];
+        return idx ? row.getCell(idx).text?.trim() : null;
+    };
+
+    const rawOS = getVal('sistema operativo') || getVal('so') || getVal('os');
+    const osStr = rawOS ? (rawOS.trim().charAt(0).toUpperCase() + rawOS.trim().slice(1).toLowerCase()) : null;
+    
+    const pandaStr = getVal('antivirus') || getVal('panda') || getVal('es panda');
+    const es_panda = ["si", "yes", "verdadero", "true"].includes(cleanLower(pandaStr));
+
+    return {
+        etiqueta: getVal('etiqueta'),
+        nombre_equipo: getVal('nombre equipo') || getVal('nombre'),
+        serie: getVal('n° serie') || getVal('serie') || getVal('numero serie') || getVal('serial'),
+        // 👇 USO DE CONSTANTES PARA VALORES POR DEFECTO
+        tipoStr: getVal('tipo') || DEFAULTS.DEVICE_TYPE,
+        estadoStr: getVal('estado') || DEVICE_STATUS.ACTIVE,
+        osStr,
+        marca: getVal('marca') || DEFAULTS.BRAND,
+        modelo: getVal('modelo') || DEFAULTS.MODEL,
+        ip_equipo: getVal('ip') || getVal('ip equipo') || DEFAULTS.IP,
+        
+        descripcion: getVal('descripcion') || "",
+        comentarios: getVal('comentarios') || getVal('observaciones') || getVal('notas'),
+        office_version: getVal('version office') || getVal('office version'),
+        office_licencia: getVal('tipo licencia') || getVal('tipo de licencia'),
+        garantia_num_prod: getVal('n producto') || getVal('garantia numero producto'),
+        garantia_inicio: parseExcelDate(getVal('inicio garantia') || getVal('garantia inicio')),
+        garantia_fin: parseExcelDate(getVal('fin garantia') || getVal('garantia fin')),
+        es_panda,
+        responsableLogin: getVal('usuario de login') || getVal('usuario login') || getVal('login') || getVal('usuarios') || getVal('usuario'),
+        responsableName: getVal('responsable (jefe') || getVal('responsable'),
+        perfiles: getVal('perfiles acceso') || getVal('perfiles') || getVal('perfiles de usuario'),
+        areaStr: getVal('área') || getVal('area'),
+        deptoStr: getVal('departamento')
+    };
+};
+
+const resolveForeignKeys = (data, context) => {
+    let usuarioId = null;
+    if (data.responsableLogin) {
+        usuarioId = context.userLoginMap.get(cleanLower(data.responsableLogin));
+    }
+    if (!usuarioId && data.responsableName) {
+        usuarioId = context.userNameMap.get(cleanLower(data.responsableName));
+    }
+
+    let areaId = null;
+    if (data.areaStr && data.deptoStr) {
+        areaId = context.areaMap.get(`${cleanLower(data.areaStr)}|${cleanLower(data.deptoStr)}`);
+    }
+    if (!areaId && data.areaStr) {
+        const possibleArea = context.areasList.find(a => cleanLower(a.nombre) === cleanLower(data.areaStr));
+        if (possibleArea) areaId = possibleArea.id;
+    }
+
+    return { usuarioId, areaId };
+};
+
+// =====================================================================
+// SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
+// =====================================================================
+
+export const importDevicesFromExcel = async (buffer) => {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const worksheet = workbook.getWorksheet(1);
+
+  const [areas, users] = await Promise.all([
+    prisma.area.findMany({ include: { departamento: true } }),
+    prisma.user.findMany(),
+  ]);
+
+  const context = {
+      userLoginMap: new Map(users.filter(i => i.usuario_login).map(i => [cleanLower(i.usuario_login), i.id])),
+      userNameMap: new Map(users.map(i => [cleanLower(i.nombre), i.id])),
+      areaMap: new Map(areas.map(a => [`${cleanLower(a.nombre)}|${cleanLower(a.departamento?.nombre)}`, a.id])),
+      areasList: areas
+  };
+
+  const headerMap = {};
+  worksheet.getRow(1).eachCell((cell, colNumber) => {
+    headerMap[cleanLower(cell.value)] = colNumber;
+  });
+
+  const devicesToProcess = [];
+  
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+
+    const rowData = extractRowData(row, headerMap);
+    const foreignKeys = resolveForeignKeys(rowData, context);
+
+    const finalNombre = rowData.nombre_equipo || `Equipo Fila ${rowNumber}`;
+    const finalSerie = rowData.serie || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
+
+    devicesToProcess.push({
+      deviceData: {
+        etiqueta: rowData.etiqueta || null,
+        nombre_equipo: finalNombre,
+        numero_serie: finalSerie,
+        marca: rowData.marca,
+        modelo: rowData.modelo,
+        ip_equipo: rowData.ip_equipo,
+        descripcion: rowData.descripcion, 
+        comentarios: rowData.comentarios || null,
+        perfiles_usuario: rowData.perfiles || null,
+        usuarioId: foreignKeys.usuarioId, 
+        areaId: foreignKeys.areaId,
+        office_version: rowData.office_version || null,
+        office_tipo_licencia: rowData.office_licencia || null,
+        garantia_numero_producto: rowData.garantia_num_prod || null,
+        garantia_inicio: rowData.garantia_inicio,
+        garantia_fin: rowData.garantia_fin,
+        es_panda: rowData.es_panda, 
+      },
+      meta: {
+        tipo: rowData.tipoStr,
+        estado: rowData.estadoStr,
+        os: rowData.osStr
+      }
+    });
+  });
+
+  let successCount = 0;
+  const errors = [];
+  
+  const caches = {
+      types: new Map(),
+      status: new Map(),
+      os: new Map()
   };
 
   for (const item of devicesToProcess) {
     try {
-      const tipoId = await getOrCreateCatalog('deviceType', item.meta.tipo, typesCache);
-      const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, statusCache);
-      const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, osCache);
+      const tipoId = await getOrCreateCatalog('deviceType', item.meta.tipo, caches.types);
+      const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, caches.status);
+      const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, caches.os);
 
       const finalData = {
         ...item.deviceData,
-        tipoId: tipoId, 
-        estadoId: estadoId,
-        sistemaOperativoId: sistemaOperativoId 
+        tipoId, 
+        estadoId,
+        sistemaOperativoId 
       };
 
       const exists = await prisma.device.findUnique({ where: { numero_serie: finalData.numero_serie } });
       
       if (!exists) {
         await prisma.device.create({ data: finalData });
-        successCount++;
       } else {
         await prisma.device.update({
           where: { id: exists.id },
           data: finalData
         });
-        successCount++;
       }
+      successCount++;
 
     } catch (error) {
-      errors.push(`Error procesando ${item.deviceData.nombre_equipo}: ${error.message}`);
+      errors.push(`Error en equipo '${item.deviceData.nombre_equipo}': ${error.message}`);
     }
   }
 
@@ -404,7 +424,7 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate) => {
     
     const devices = await prisma.device.findMany({
         where: {
-            estado: { NOT: { nombre: "Baja" } },
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
             garantia_fin: {
                 lt: today.toISOString() 
             }

@@ -1,10 +1,7 @@
 // src/utils/preloadData.js
 import prisma from "../PrismaClient.js";
+import { ROLES, DEVICE_STATUS } from "../config/constants.js"; // 👈 CONSTANTES
 
-/*
- * Precarga datos maestros (Departamentos, Áreas, Tipos, Estados, SO)
- * Asegura que existan los registros base sin duplicarlos.
- */
 export const preloadMasterData = async () => {
     console.log("Iniciando precarga de datos maestros...");
     
@@ -24,7 +21,6 @@ export const preloadMasterData = async () => {
 
     let deptMap = {};
 
-    // 1. Cargando Departamentos (Upsert para evitar duplicados)
     console.log("Verificando Departamentos...");
     for (const nombre of DEPARTMENTS) {
         const dept = await prisma.department.upsert({
@@ -35,7 +31,6 @@ export const preloadMasterData = async () => {
         deptMap[dept.nombre] = dept.id;
     }
 
-    // 2. Cargando Áreas
     console.log("Verificando Áreas...");
     const AREAS = [
         // Gerencia General
@@ -92,7 +87,6 @@ export const preloadMasterData = async () => {
     for (const area of AREAS) {
         const deptId = deptMap[area.deptoName];
         if (deptId) {
-            // Buscamos si existe para no duplicar (la combinación nombre+depto es única)
             const existing = await prisma.area.findFirst({
                 where: { 
                     nombre: area.nombre,
@@ -113,7 +107,6 @@ export const preloadMasterData = async () => {
         }
     }
     
-    // 3. Tipos de Dispositivo
     console.log("Verificando Tipos de Dispositivo...");
     const DEVICE_TYPES = ["Laptop", "Estación", "Servidor", "AIO"];
     await Promise.all(
@@ -126,9 +119,9 @@ export const preloadMasterData = async () => {
         )
     );
     
-    // 4. Estados de Dispositivo
     console.log("Verificando Estados...");
-    const DEVICE_STATUSES = ["Activo", "Baja"];
+    // 👇 USO DE CONSTANTES
+    const DEVICE_STATUSES = [DEVICE_STATUS.ACTIVE, DEVICE_STATUS.DISPOSED];
     await Promise.all(
         DEVICE_STATUSES.map(nombre => 
             prisma.deviceStatus.upsert({
@@ -139,8 +132,6 @@ export const preloadMasterData = async () => {
         )
     );
     
-    // 5. Sistemas Operativos (CORREGIDO)
-    // Usamos los nombres genéricos para que coincidan con la importación de Excel
     console.log("Verificando Sistemas Operativos...");
     const OS_LIST = ["Windows 11", "Windows 10", "Windows 7", "Windows Server", "Windows XP"];
     
@@ -153,6 +144,26 @@ export const preloadMasterData = async () => {
             })
         )
     );
+
+    // Crear SuperAdmin
+    const superAdmin = await prisma.userSistema.findFirst({
+      where: { username: "superadmin", rol: ROLES.ADMIN } // 👈 CONSTANTE
+    });
+
+    if (!superAdmin) {
+      const bcrypt = await import("bcryptjs");
+      const hashedPassword = await bcrypt.default.hash("superadmin123", 10);
+      const user = await prisma.userSistema.create({
+        data: {
+          username: "superadmin",
+          email: "superadmin@crownparadise.com",
+          password: hashedPassword,
+          nombre: "Super Administrador",
+          rol: ROLES.ADMIN, // 👈 CONSTANTE
+        },
+      });
+      console.log("Superusuario creado:", user.username);
+    } 
 
     console.log("Precarga de datos maestros finalizada.");
 };

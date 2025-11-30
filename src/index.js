@@ -19,6 +19,8 @@ import maintenanceRoutes from "./routes/maintenance.routes.js";
 import disposalRoutes from "./routes/disposal.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 
+import { errorHandler } from "./middlewares/errorHandler.js";
+
 dotenv.config();
 
 const app = express();
@@ -36,6 +38,8 @@ app.use("/api/devices", devicesRoutes);
 app.use("/api/maintenances", maintenanceRoutes);
 app.use("/api/disposals", disposalRoutes);
 app.use("/api/auth", authRoutes);
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 

@@ -1,6 +1,6 @@
 import * as operatingSystemService from "../services/operatingSystem.service.js";
 
-export const getOperatingSystems = async (req, res) => {
+export const getOperatingSystems = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -29,48 +29,47 @@ export const getOperatingSystems = async (req, res) => {
       totalPages: Math.ceil(totalCount / limit)
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const getOperatingSystem = async (req, res) => {
+export const getOperatingSystem = async (req, res, next) => {
   try {
     const os = await operatingSystemService.getOperatingSystemById(req.params.id);
     if (!os) return res.status(404).json({ message: "Operating System not found" });
     res.json(os);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const createOperatingSystem = async (req, res) => {
+export const createOperatingSystem = async (req, res, next) => {
   try {
     const os = await operatingSystemService.createOperatingSystem(req.body);
     res.status(201).json(os);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const updateOperatingSystem = async (req, res) => {
+export const updateOperatingSystem = async (req, res, next) => {
   try {
     const oldOs = await operatingSystemService.getOperatingSystemById(req.params.id);
     if (!oldOs) return res.status(404).json({ message: "Operating System not found" });
     const os = await operatingSystemService.updateOperatingSystem(req.params.id, req.body);
     res.json(os);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-export const deleteOperatingSystem = async (req, res) => {
+export const deleteOperatingSystem = async (req, res, next) => {
   try {
     const oldOs = await operatingSystemService.getOperatingSystemById(req.params.id);
     if (!oldOs) return res.status(404).json({ message: "Operating System not found" });
     await operatingSystemService.deleteOperatingSystem(req.params.id);
     res.json({ message: "Operating System deleted" });
   } catch (error) {
-    if (error.code === 'P2003') return res.status(400).json({ error: "No se puede eliminar porque está en uso." });
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

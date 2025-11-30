@@ -2,7 +2,10 @@
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 
-// --- Funciones CRUD normales (Sin cambios) ---
+// =====================================================================
+// SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR (Sin cambios mayores)
+// =====================================================================
+
 export const getUsers = async ({ skip, take, search, sortBy, order }) => {
   const whereClause = search ? {
     OR: [
@@ -31,7 +34,7 @@ export const getUsers = async ({ skip, take, search, sortBy, order }) => {
       },
       skip: skip,
       take: take,
-      orderBy: orderBy // 👈 Usamos el objeto dinámico
+      orderBy: orderBy
     }),
     prisma.user.count({ where: whereClause })
   ]);
@@ -68,102 +71,127 @@ export const deleteUser = (id) => prisma.user.delete({
   where: { id: Number(id) },
 });
 
-// --- IMPORTACIÓN "ACEPTAR TODO" ---
-export const importUsersFromExcel = async (buffer) => {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
-  const worksheet = workbook.getWorksheet(1);
+// =====================================================================
+// SECCIÓN 2: HELPERS PARA IMPORTACIÓN (Refactorizado)
+// =====================================================================
 
-  const usersToCreate = [];
-  const errors = []; // Se usará solo para errores críticos de BD, no de validación
+// Limpieza de strings
+const clean = (txt) => txt ? txt.toString().trim() : "";
+const cleanLower = (txt) => clean(txt).toLowerCase();
 
-  // 1. Cargar Áreas
-  const areas = await prisma.area.findMany({
-    include: { departamento: true }
-  });
-
-  const clean = (txt) => txt ? txt.toString().trim().toLowerCase() : "";
-
-  const areaMap = new Map();
-  areas.forEach(a => {
-    const key = `${clean(a.nombre)}|${clean(a.departamento?.nombre)}`;
-    areaMap.set(key, a.id);
-  });
-
-  // 2. Mapear Encabezados
-  const headerMap = {};
-  const headerRow = worksheet.getRow(1);
-  
-  headerRow.eachCell((cell, colNumber) => {
-      const headerText = clean(cell.value);
-      headerMap[headerText] = colNumber;
-  });
-
-  // 3. Leer filas
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return; 
-
+// Extrae datos crudos de la fila
+const extractRowData = (row, headerMap) => {
     const getVal = (key) => {
+        // Busca coincidencias parciales si la key exacta no existe (opcional) o usa keys exactas
         const colIdx = headerMap[key];
-        if (!colIdx) return null; 
-        return row.getCell(colIdx).text?.trim();
+        return colIdx ? row.getCell(colIdx).text?.trim() : null;
     };
 
-    // Buscar valores
-    // Si NO hay nombre, ponemos un placeholder para que no falle la BD
+    // Mapeo flexible de nombres de columna
     const nombreRaw = getVal('nombre');
-    const nombre = nombreRaw || `Usuario Sin Nombre Fila ${rowNumber}`; 
-
     const correo = getVal('correo') || getVal('email');
     const areaNombre = getVal('área') || getVal('area'); 
     const deptoNombre = getVal('departamento') || getVal('depto');
     const usuario_login = getVal('usuario de login') || getVal('usuario') || getVal('login');
     const esJefeRaw = getVal('es jefe') || getVal('jefe') || getVal('es jefe de area');
 
-    // Lógica "Es Jefe"
-    const es_jefe_de_area = clean(esJefeRaw) === "si" || clean(esJefeRaw) === "yes" || clean(esJefeRaw) === "verdadero";
+    // Normalizar booleano
+    const es_jefe_de_area = ["si", "yes", "verdadero", "true"].includes(cleanLower(esJefeRaw));
 
-    // Buscar ID de Área
+    return {
+        nombre: nombreRaw,
+        correo: correo || null,
+        areaNombre,
+        deptoNombre,
+        usuario_login: usuario_login || null,
+        es_jefe_de_area
+    };
+};
+
+// Resuelve la relación de Área
+const resolveArea = (data, context) => {
     let areaId = null;
-    if (areaNombre && deptoNombre) {
-      const key = `${clean(areaNombre)}|${clean(deptoNombre)}`;
-      areaId = areaMap.get(key);
+    if (data.areaNombre && data.deptoNombre) {
+      // 1. Intento exacto: Nombre Área + Nombre Depto
+      const key = `${cleanLower(data.areaNombre)}|${cleanLower(data.deptoNombre)}`;
+      areaId = context.areaMap.get(key);
       
+      // 2. Intento parcial: Solo por nombre de área (si es único en la lista)
       if (!areaId) {
-         const areasFound = areas.filter(a => clean(a.nombre) === clean(areaNombre));
+         const areasFound = context.areasList.filter(a => cleanLower(a.nombre) === cleanLower(data.areaNombre));
          if (areasFound.length === 1) areaId = areasFound[0].id;
       }
     }
+    return areaId;
+};
+
+// =====================================================================
+// SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
+// =====================================================================
+
+export const importUsersFromExcel = async (buffer) => {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const worksheet = workbook.getWorksheet(1);
+
+  const usersToCreate = [];
+  const errors = [];
+
+  // 1. Cargar Contexto (Áreas existentes)
+  const areas = await prisma.area.findMany({
+    include: { departamento: true }
+  });
+
+  const context = {
+      areaMap: new Map(areas.map(a => [`${cleanLower(a.nombre)}|${cleanLower(a.departamento?.nombre)}`, a.id])),
+      areasList: areas
+  };
+
+  // 2. Mapear Encabezados
+  const headerMap = {};
+  worksheet.getRow(1).eachCell((cell, colNumber) => {
+      headerMap[cleanLower(cell.value)] = colNumber;
+  });
+
+  // 3. Procesar Filas
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return; 
+
+    const rowData = extractRowData(row, headerMap);
+    const areaId = resolveArea(rowData, context);
+
+    // Validación mínima: Nombre es obligatorio para identificar
+    const nombreFinal = rowData.nombre || `Usuario Sin Nombre Fila ${rowNumber}`;
 
     usersToCreate.push({
-      nombre, // Siempre tendrá valor
-      correo: correo || null, // Permitimos null
+      nombre: nombreFinal,
+      correo: rowData.correo,
       areaId,
-      usuario_login: usuario_login || null,
-      es_jefe_de_area
+      usuario_login: rowData.usuario_login,
+      es_jefe_de_area: rowData.es_jefe_de_area
     });
   });
 
-  // 4. Insertar / Actualizar
+  // 4. Escritura en BD (Upsert Lógico)
   let successCount = 0;
+  
   for (const u of usersToCreate) {
     try {
-      // Usamos findFirst porque 'nombre' no es unique en el schema, pero queremos evitar duplicados lógicos
+      // Buscamos si existe por nombre (puedes cambiarlo a correo o login si prefieres que sean únicos)
       const existing = await prisma.user.findFirst({ where: { nombre: u.nombre } });
       
       if (!existing) {
           await prisma.user.create({ data: u });
-          successCount++;
       } else {
-          // Actualizamos datos (por si cambió el área o el status de jefe)
+          // Actualizamos datos existentes
           await prisma.user.update({
               where: { id: existing.id },
               data: u
           });
-          successCount++;
       }
+      successCount++;
     } catch (error) {
-      errors.push(`Error BD en fila ${u.nombre}: ${error.message}`);
+      errors.push(`Error BD en fila '${u.nombre}': ${error.message}`);
     }
   }
 
