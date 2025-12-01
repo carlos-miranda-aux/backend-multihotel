@@ -2,7 +2,7 @@
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
-import { DEVICE_STATUS } from "../config/constants.js"; // 👈 CONSTANTE
+import { DEVICE_STATUS } from "../config/constants.js"; 
 
 export const getDevices = async (req, res, next) => {
   try {
@@ -66,9 +66,9 @@ export const getPandaStatus = async (req, res, next) => {
 
 export const createDevice = async (req, res, next) => {
     try {
+      // 1. Extraemos y limpiamos datos que no van directo al modelo
       const { fecha_proxima_revision, garantia_numero_reporte, garantia_notes, ...deviceData } = req.body;
       
-      // 👇 USO DE CONSTANTE
       const estadoActivo = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.ACTIVE } });
       
       if (!estadoActivo) return res.status(400).json({ error: `No existe un estado llamado "${DEVICE_STATUS.ACTIVE}" en la base de datos.` });
@@ -84,9 +84,14 @@ export const createDevice = async (req, res, next) => {
         estadoId: estadoActivo.id,
         garantia_numero_reporte: garantia_numero_reporte || null,
         garantia_notes: garantia_notes || null,
+        // Aseguramos que campos string NOT NULL no reciban null si la DB lo exige
+        motivo_baja: null, 
+        observaciones_baja: null 
       };
+
       const newDevice = await deviceService.createDevice(dataToCreate);
       
+      // 2. Crear mantenimiento automático si se especificó fecha
       if (fecha_proxima_revision) {
         await prisma.maintenance.create({
           data: {
@@ -94,6 +99,10 @@ export const createDevice = async (req, res, next) => {
             fecha_programada: new Date(fecha_proxima_revision),
             estado: "pendiente",
             deviceId: newDevice.id,
+            // 👇 SOLUCIÓN ERROR 500: Llenamos campos que podrían ser obligatorios
+            diagnostico: "Programado", 
+            acciones_realizadas: "Pendiente de revisión",
+            observaciones: ""
           }
         });
       }

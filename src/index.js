@@ -78,7 +78,7 @@ app.listen(PORT, async () => {
   
   //cron.schedule('* * * * *', async () => {
   cron.schedule('0 9 * * *', async () => {
-    console.log('Ejecutando tarea programada (7:00 AM)...');
+    console.log('Ejecutando tarea programada (9:00 AM)...');
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
