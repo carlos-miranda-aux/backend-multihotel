@@ -339,3 +339,12 @@ export const exportCorrectiveAnalysis = async (req, res, next) => {
         next(error);
     }
 };
+
+export const getDashboardData = async (req, res, next) => {
+    try {
+        const stats = await deviceService.getDashboardStats();
+        res.json(stats);
+    } catch (error) {
+        next(error);
+    }
+};

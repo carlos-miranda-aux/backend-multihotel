@@ -492,3 +492,68 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate) => {
         };
     });
 };
+
+export const getDashboardStats = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Fecha límite para "Riesgo" (90 días)
+    const ninetyDaysFromNow = new Date(today);
+    ninetyDaysFromNow.setDate(today.getDate() + 90);
+    ninetyDaysFromNow.setHours(23, 59, 59, 999);
+
+    // Fechas para bajas del mes actual
+    const date = new Date();
+    const firstDayMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const lastDayMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    lastDayMonth.setHours(23, 59, 59, 999);
+
+    const activeFilter = { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } };
+
+    const [
+        totalActive,
+        withPanda,
+        expiredWarranty,
+        riskWarranty,
+        currentMonthDisposals,
+        warrantyAlerts
+    ] = await prisma.$transaction([
+        // 1. Total Activos
+        prisma.device.count({ where: activeFilter }),
+        
+        // 2. Con Panda (Activos)
+        prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
+        
+        // 3. Garantía Expirada (Activos)
+        prisma.device.count({ where: { ...activeFilter, garantia_fin: { lt: today.toISOString() } } }),
+        
+        // 4. Garantía Riesgo 90 días (Activos)
+        prisma.device.count({ where: { ...activeFilter, garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } } }),
+
+        // 5. Bajas del mes actual (Para el widget rojo)
+        prisma.device.count({ 
+            where: { 
+                estado: { nombre: DEVICE_STATUS.DISPOSED },
+                fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() }
+            }
+        }),
+
+        // 6. Lista de Alertas para la Campana (Solo ID y nombres, ligero)
+        prisma.device.findMany({
+            where: {
+                ...activeFilter,
+                OR: [
+                    { garantia_fin: { lt: today.toISOString() } },
+                    { garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } }
+                ]
+            },
+            select: {
+                id: true,
+                nombre_equipo: true,
+                etiqueta: true,
+                garantia_fin: true
+            },
+            orderBy: { garantia_fin: 'asc' }
+        })
+    ]);
+}

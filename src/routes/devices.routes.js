@@ -12,7 +12,8 @@ import {
   exportAllDevices,
   importDevices,
   exportCorrectiveAnalysis,
-  getPandaStatus
+  getPandaStatus,
+  getDashboardData
 } from "../controllers/device.controller.js";
 import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 // 👇 IMPORTAMOS LOS VALIDADORES
@@ -49,4 +50,5 @@ router.post("/import", verifyToken, verifyRole(["ADMIN"]), upload.single("file")
 
 router.get("/export/corrective-analysis", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportCorrectiveAnalysis);
 
+router.get("/get/dashboard-stats", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDashboardData);
 export default router;
