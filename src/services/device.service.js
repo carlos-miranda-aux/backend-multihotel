@@ -2,7 +2,7 @@
 
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
-import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js"; // 👈 CONSTANTES
+import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js"; 
 
 // =====================================================================
 // SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
@@ -10,7 +10,7 @@ import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js"; // 👈 CONSTA
 
 export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }) => { 
   const whereClause = {
-    estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
+    estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
   };
 
   if (search) {
@@ -91,15 +91,17 @@ export const createDevice = (data) => prisma.device.create({ data });
 export const updateDevice = async (id, data) => {
   const deviceId = Number(id);
   const oldDevice = await prisma.device.findUnique({ where: { id: deviceId } });
-  if (!oldDevice) throw new Error("Dispositivo no encontrado");
+  
+  // Mensaje amigable
+  if (!oldDevice) throw new Error("El dispositivo que intentas editar no existe.");
 
-  // 👇 USO DE CONSTANTE
   const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.DISPOSED } });
   const disposedStatusId = disposedStatus?.id;
 
   if (disposedStatusId) {
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
-        throw new Error("No se puede reactivar un equipo que ya ha sido dado de baja.");
+        // Mensaje claro de regla de negocio
+        throw new Error("Acción bloqueada: No se puede reactivar un equipo que ya ha sido dado de baja permanentemente.");
     } else if (oldDevice.estadoId === disposedStatusId) {
         data.estadoId = disposedStatusId;
     } else if (data.estadoId === disposedStatusId) {
@@ -113,7 +115,21 @@ export const updateDevice = async (id, data) => {
   });
 };
 
-export const deleteDevice = (id) => prisma.device.delete({ where: { id: Number(id) } });
+export const deleteDevice = async (id) => {
+    // Verificación antes de borrar
+    const deviceId = Number(id);
+    const existing = await prisma.device.findUnique({ 
+        where: { id: deviceId },
+        include: { maintenances: true }
+    });
+
+    if (!existing) throw new Error("El dispositivo no existe.");
+    if (existing.maintenances.length > 0) {
+        throw new Error("No se puede eliminar el equipo porque tiene mantenimientos en el historial. Intenta darlo de Baja en su lugar.");
+    }
+
+    return prisma.device.delete({ where: { id: deviceId } });
+};
 
 export const getDeviceById = (id) =>
   prisma.device.findUnique({
@@ -129,7 +145,6 @@ export const getDeviceById = (id) =>
 
 export const getAllActiveDeviceNames = () =>
   prisma.device.findMany({
-    // 👇 USO DE CONSTANTE
     where: { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } },
     select: {
       id: true,
@@ -142,7 +157,6 @@ export const getAllActiveDeviceNames = () =>
 
 export const getInactiveDevices = async ({ skip, take, search }) => {
   const whereClause = {
-    // 👇 USO DE CONSTANTE
     estado: { nombre: DEVICE_STATUS.DISPOSED },
   };
 
@@ -179,13 +193,12 @@ export const getInactiveDevices = async ({ skip, take, search }) => {
 
 export const getPandaStatusCounts = async () => {
     const totalActiveDevices = await prisma.device.count({
-        // 👇 USO DE CONSTANTE
         where: { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } }
     });
 
     const devicesWithPanda = await prisma.device.count({
         where: {
-            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
             es_panda: true
         }
     });
@@ -195,7 +208,7 @@ export const getPandaStatusCounts = async () => {
 
     const expiredWarrantiesCount = await prisma.device.count({
         where: {
-            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, 
             garantia_fin: { lt: today.toISOString() }
         }
     });
@@ -266,7 +279,6 @@ const extractRowData = (row, headerMap) => {
         etiqueta: getVal('etiqueta'),
         nombre_equipo: getVal('nombre equipo') || getVal('nombre'),
         serie: getVal('n° serie') || getVal('serie') || getVal('numero serie') || getVal('serial'),
-        // 👇 USO DE CONSTANTES PARA VALORES POR DEFECTO
         tipoStr: getVal('tipo') || DEFAULTS.DEVICE_TYPE,
         estadoStr: getVal('estado') || DEVICE_STATUS.ACTIVE,
         osStr,
@@ -310,10 +322,6 @@ const resolveForeignKeys = (data, context) => {
 
     return { usuarioId, areaId };
 };
-
-// =====================================================================
-// SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
-// =====================================================================
 
 export const importDevicesFromExcel = async (buffer) => {
   const workbook = new ExcelJS.Workbook();
@@ -411,7 +419,7 @@ export const importDevicesFromExcel = async (buffer) => {
       successCount++;
 
     } catch (error) {
-      errors.push(`Error en equipo '${item.deviceData.nombre_equipo}': ${error.message}`);
+      errors.push(`Error al importar '${item.deviceData.nombre_equipo}': ${error.message}`);
     }
   }
 
@@ -424,7 +432,7 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate) => {
     
     const devices = await prisma.device.findMany({
         where: {
-            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, // 👈 CONSTANTE
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
             garantia_fin: {
                 lt: today.toISOString() 
             }
