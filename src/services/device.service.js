@@ -93,15 +93,20 @@ export const updateDevice = async (id, data) => {
   const oldDevice = await prisma.device.findUnique({ where: { id: deviceId } });
   if (!oldDevice) throw new Error("Dispositivo no encontrado");
 
+  // Buscar el ID del estado "Baja"
   const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.DISPOSED } });
   const disposedStatusId = disposedStatus?.id;
 
   if (disposedStatusId) {
+    // CASO 1: Reactivación (Estaba de baja y cambia a otro estado)
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
-        throw new Error("No se puede reactivar un equipo que ya ha sido dado de baja.");
-    } else if (oldDevice.estadoId === disposedStatusId) {
-        data.estadoId = disposedStatusId;
-    } else if (data.estadoId === disposedStatusId) {
+        // Limpiamos los datos de la baja para que quede limpio
+        data.fecha_baja = null;
+        data.motivo_baja = null;
+        data.observaciones_baja = null;
+    } 
+    // CASO 2: Baja Nueva (No estaba de baja y pasa a baja)
+    else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
         data.fecha_baja = new Date();
     }
   }

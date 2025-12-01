@@ -64,7 +64,7 @@ export const getPandaStatus = async (req, res, next) => {
     }
 };
 
-// 👇 NUEVO CONTROLADOR PARA DASHBOARD
+// 👇 CONTROLADOR PARA DASHBOARD
 export const getDashboardData = async (req, res, next) => {
     try {
         const stats = await deviceService.getDashboardStats();
