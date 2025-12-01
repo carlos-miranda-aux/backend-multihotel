@@ -64,9 +64,18 @@ export const getPandaStatus = async (req, res, next) => {
     }
 };
 
+// 👇 NUEVO CONTROLADOR PARA DASHBOARD
+export const getDashboardData = async (req, res, next) => {
+    try {
+        const stats = await deviceService.getDashboardStats();
+        res.json(stats);
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const createDevice = async (req, res, next) => {
     try {
-      // 1. Extraemos y limpiamos datos que no van directo al modelo
       const { fecha_proxima_revision, garantia_numero_reporte, garantia_notes, ...deviceData } = req.body;
       
       const estadoActivo = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.ACTIVE } });
@@ -84,14 +93,12 @@ export const createDevice = async (req, res, next) => {
         estadoId: estadoActivo.id,
         garantia_numero_reporte: garantia_numero_reporte || null,
         garantia_notes: garantia_notes || null,
-        // Aseguramos que campos string NOT NULL no reciban null si la DB lo exige
         motivo_baja: null, 
         observaciones_baja: null 
       };
 
       const newDevice = await deviceService.createDevice(dataToCreate);
       
-      // 2. Crear mantenimiento automático si se especificó fecha
       if (fecha_proxima_revision) {
         await prisma.maintenance.create({
           data: {
@@ -99,7 +106,6 @@ export const createDevice = async (req, res, next) => {
             fecha_programada: new Date(fecha_proxima_revision),
             estado: "pendiente",
             deviceId: newDevice.id,
-            // 👇 SOLUCIÓN ERROR 500: Llenamos campos que podrían ser obligatorios
             diagnostico: "Programado", 
             acciones_realizadas: "Pendiente de revisión",
             observaciones: ""
@@ -335,15 +341,6 @@ export const exportCorrectiveAnalysis = async (req, res, next) => {
         await workbook.xlsx.write(res);
         res.end();
 
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const getDashboardData = async (req, res, next) => {
-    try {
-        const stats = await deviceService.getDashboardStats();
-        res.json(stats);
     } catch (error) {
         next(error);
     }

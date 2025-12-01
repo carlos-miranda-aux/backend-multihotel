@@ -53,17 +53,17 @@ app.listen(PORT, async () => {
     await preloadMasterData();
 
     const superAdmin = await prisma.userSistema.findFirst({
-      where: { username: "superadmin", rol: "ADMIN" }
+      where: { username: "admin", rol: "ADMIN" }
     });
 
     if (!superAdmin) {
-      const hashedPassword = await bcrypt.hash("superadmin123", 10);
+      const hashedPassword = await bcrypt.hash("admin", 10);
       const user = await prisma.userSistema.create({
         data: {
-          username: "superadmin",
-          email: "superadmin@crownparadise.com",
+          username: "admin",
+          email: "admin@simet.cpc",
           password: hashedPassword,
-          nombre: "Super Administrador",
+          nombre: "Administrador",
           rol: "ADMIN",
         },
       });

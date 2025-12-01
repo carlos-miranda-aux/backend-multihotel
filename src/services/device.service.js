@@ -91,17 +91,14 @@ export const createDevice = (data) => prisma.device.create({ data });
 export const updateDevice = async (id, data) => {
   const deviceId = Number(id);
   const oldDevice = await prisma.device.findUnique({ where: { id: deviceId } });
-  
-  // Mensaje amigable
-  if (!oldDevice) throw new Error("El dispositivo que intentas editar no existe.");
+  if (!oldDevice) throw new Error("Dispositivo no encontrado");
 
   const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.DISPOSED } });
   const disposedStatusId = disposedStatus?.id;
 
   if (disposedStatusId) {
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
-        // Mensaje claro de regla de negocio
-        throw new Error("Acción bloqueada: No se puede reactivar un equipo que ya ha sido dado de baja permanentemente.");
+        throw new Error("No se puede reactivar un equipo que ya ha sido dado de baja.");
     } else if (oldDevice.estadoId === disposedStatusId) {
         data.estadoId = disposedStatusId;
     } else if (data.estadoId === disposedStatusId) {
@@ -115,21 +112,7 @@ export const updateDevice = async (id, data) => {
   });
 };
 
-export const deleteDevice = async (id) => {
-    // Verificación antes de borrar
-    const deviceId = Number(id);
-    const existing = await prisma.device.findUnique({ 
-        where: { id: deviceId },
-        include: { maintenances: true }
-    });
-
-    if (!existing) throw new Error("El dispositivo no existe.");
-    if (existing.maintenances.length > 0) {
-        throw new Error("No se puede eliminar el equipo porque tiene mantenimientos en el historial. Intenta darlo de Baja en su lugar.");
-    }
-
-    return prisma.device.delete({ where: { id: deviceId } });
-};
+export const deleteDevice = (id) => prisma.device.delete({ where: { id: Number(id) } });
 
 export const getDeviceById = (id) =>
   prisma.device.findUnique({
@@ -208,7 +191,7 @@ export const getPandaStatusCounts = async () => {
 
     const expiredWarrantiesCount = await prisma.device.count({
         where: {
-            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } }, 
+            estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
             garantia_fin: { lt: today.toISOString() }
         }
     });
@@ -220,6 +203,91 @@ export const getPandaStatusCounts = async () => {
         devicesWithPanda,
         devicesWithoutPanda,
         expiredWarrantiesCount 
+    };
+};
+
+// 👇 FUNCIÓN OPTIMIZADA PARA DASHBOARD (CORREGIDA)
+export const getDashboardStats = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Fecha límite para "Riesgo" (90 días)
+    const ninetyDaysFromNow = new Date(today);
+    ninetyDaysFromNow.setDate(today.getDate() + 90);
+    ninetyDaysFromNow.setHours(23, 59, 59, 999);
+
+    // Fechas para bajas del mes actual
+    const date = new Date();
+    const firstDayMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const lastDayMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    lastDayMonth.setHours(23, 59, 59, 999);
+
+    const activeFilter = { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } };
+
+    const [
+        totalActive,
+        withPanda,
+        expiredWarranty,
+        riskWarranty,
+        currentMonthDisposals,
+        warrantyAlerts
+    ] = await prisma.$transaction([
+        // 1. Total Activos
+        prisma.device.count({ where: activeFilter }),
+        
+        // 2. Con Panda (Activos)
+        prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
+        
+        // 3. Garantía Expirada (Activos)
+        prisma.device.count({ where: { ...activeFilter, garantia_fin: { lt: today.toISOString() } } }),
+        
+        // 4. Garantía Riesgo 90 días (Activos)
+        prisma.device.count({ where: { ...activeFilter, garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } } }),
+
+        // 5. Bajas del mes actual
+        prisma.device.count({ 
+            where: { 
+                estado: { nombre: DEVICE_STATUS.DISPOSED },
+                fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() }
+            }
+        }),
+
+        // 6. Lista de Alertas para la Campana 
+        // CORRECCIÓN: Ahora SOLO trae las que están "En Riesgo" (gte Today), excluyendo las vencidas (lt Today).
+        prisma.device.findMany({
+            where: {
+                ...activeFilter,
+                garantia_fin: { 
+                    gte: today.toISOString(),        // Desde hoy
+                    lte: ninetyDaysFromNow.toISOString() // Hasta 90 días
+                }
+            },
+            select: {
+                id: true,
+                nombre_equipo: true,
+                etiqueta: true,
+                garantia_fin: true
+            },
+            orderBy: { garantia_fin: 'asc' }
+        })
+    ]);
+
+    const withoutPanda = totalActive - withPanda;
+    const safeWarranty = totalActive - expiredWarranty - riskWarranty;
+
+    return {
+        kpis: {
+            totalActiveDevices: totalActive,
+            devicesWithPanda: withPanda,
+            devicesWithoutPanda: withoutPanda,
+            monthlyDisposals: currentMonthDisposals
+        },
+        warrantyStats: {
+            expired: expiredWarranty,
+            risk: riskWarranty,
+            safe: safeWarranty
+        },
+        warrantyAlertsList: warrantyAlerts // Ahora esta lista viene limpia de expirados
     };
 };
 
@@ -285,7 +353,6 @@ const extractRowData = (row, headerMap) => {
         marca: getVal('marca') || DEFAULTS.BRAND,
         modelo: getVal('modelo') || DEFAULTS.MODEL,
         ip_equipo: getVal('ip') || getVal('ip equipo') || DEFAULTS.IP,
-        
         descripcion: getVal('descripcion') || "",
         comentarios: getVal('comentarios') || getVal('observaciones') || getVal('notas'),
         office_version: getVal('version office') || getVal('office version'),
@@ -322,6 +389,10 @@ const resolveForeignKeys = (data, context) => {
 
     return { usuarioId, areaId };
 };
+
+// =====================================================================
+// SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
+// =====================================================================
 
 export const importDevicesFromExcel = async (buffer) => {
   const workbook = new ExcelJS.Workbook();
@@ -419,7 +490,7 @@ export const importDevicesFromExcel = async (buffer) => {
       successCount++;
 
     } catch (error) {
-      errors.push(`Error al importar '${item.deviceData.nombre_equipo}': ${error.message}`);
+      errors.push(`Error en equipo '${item.deviceData.nombre_equipo}': ${error.message}`);
     }
   }
 
@@ -492,68 +563,3 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate) => {
         };
     });
 };
-
-export const getDashboardStats = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Fecha límite para "Riesgo" (90 días)
-    const ninetyDaysFromNow = new Date(today);
-    ninetyDaysFromNow.setDate(today.getDate() + 90);
-    ninetyDaysFromNow.setHours(23, 59, 59, 999);
-
-    // Fechas para bajas del mes actual
-    const date = new Date();
-    const firstDayMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const lastDayMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    lastDayMonth.setHours(23, 59, 59, 999);
-
-    const activeFilter = { estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } } };
-
-    const [
-        totalActive,
-        withPanda,
-        expiredWarranty,
-        riskWarranty,
-        currentMonthDisposals,
-        warrantyAlerts
-    ] = await prisma.$transaction([
-        // 1. Total Activos
-        prisma.device.count({ where: activeFilter }),
-        
-        // 2. Con Panda (Activos)
-        prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
-        
-        // 3. Garantía Expirada (Activos)
-        prisma.device.count({ where: { ...activeFilter, garantia_fin: { lt: today.toISOString() } } }),
-        
-        // 4. Garantía Riesgo 90 días (Activos)
-        prisma.device.count({ where: { ...activeFilter, garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } } }),
-
-        // 5. Bajas del mes actual (Para el widget rojo)
-        prisma.device.count({ 
-            where: { 
-                estado: { nombre: DEVICE_STATUS.DISPOSED },
-                fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() }
-            }
-        }),
-
-        // 6. Lista de Alertas para la Campana (Solo ID y nombres, ligero)
-        prisma.device.findMany({
-            where: {
-                ...activeFilter,
-                OR: [
-                    { garantia_fin: { lt: today.toISOString() } },
-                    { garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } }
-                ]
-            },
-            select: {
-                id: true,
-                nombre_equipo: true,
-                etiqueta: true,
-                garantia_fin: true
-            },
-            orderBy: { garantia_fin: 'asc' }
-        })
-    ]);
-}
