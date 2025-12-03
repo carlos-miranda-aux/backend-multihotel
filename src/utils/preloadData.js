@@ -147,23 +147,20 @@ export const preloadMasterData = async () => {
 
     // Crear SuperAdmin
     const superAdmin = await prisma.userSistema.findFirst({
-      where: { username: "superadmin", rol: ROLES.ADMIN } // 👈 CONSTANTE
+      where: { username: "admin", rol: ROLES.ADMIN } // 👈 CONSTANTE
     });
 
     if (!superAdmin) {
       const bcrypt = await import("bcryptjs");
-      const hashedPassword = await bcrypt.default.hash("superadmin123", 10);
+      const hashedPassword = await bcrypt.default.hash("admin", 10);
       const user = await prisma.userSistema.create({
         data: {
-          username: "superadmin",
-          email: "superadmin@crownparadise.com",
+          username: "admin",
+          email: "admin@simet.cpc",
           password: hashedPassword,
-          nombre: "Super Administrador",
+          nombre: "Admin",
           rol: ROLES.ADMIN, // 👈 CONSTANTE
         },
       });
-      console.log("Superusuario creado:", user.username);
     } 
-
-    console.log("Precarga de datos maestros finalizada.");
 };

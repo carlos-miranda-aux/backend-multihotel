@@ -55,25 +55,8 @@ app.listen(PORT, async () => {
 
     await preloadMasterData();
 
-    const superAdmin = await prisma.userSistema.findFirst({
-      where: { username: "admin", rol: "ADMIN" }
-    });
-
-    if (!superAdmin) {
-      const hashedPassword = await bcrypt.hash("admin", 10);
-      const user = await prisma.userSistema.create({
-        data: {
-          username: "admin",
-          email: "admin@simet.cpc",
-          password: hashedPassword,
-          nombre: "Administrador",
-          rol: "ADMIN",
-        },
-      });
-      console.log("Superusuario creado:", user.username);
-    } 
   } catch (err) {
-    console.error("Error al conectar a la DB o crear superusuario:", err);
+    console.error(err);
   }
 
   // --- TAREA PROGRAMADA (CRON) ---
