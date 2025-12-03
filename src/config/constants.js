@@ -1,9 +1,12 @@
 // src/config/constants.js
 
 export const ROLES = {
-  ADMIN: "ADMIN",
-  EDITOR: "EDITOR",
-  USER: "USER",
+  ROOT: "ROOT",  //Dev
+  CORP_VIEWER: "CORP_VIEWER",  //Global lecture
+  HOTEL_ADMIN: "HOTEL_ADMIN",  //admin local
+  HOTEL_AUX: "HOTEL_AUX",      //asistente local
+  HOTEL_GUEST: "HOTEL_GUEST",  //inivtado (only lecture)
+
 };
 
 export const DEVICE_STATUS = {

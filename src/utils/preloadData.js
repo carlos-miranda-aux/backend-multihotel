@@ -1,166 +1,158 @@
 // src/utils/preloadData.js
 import prisma from "../PrismaClient.js";
-import { ROLES, DEVICE_STATUS } from "../config/constants.js"; // 👈 CONSTANTES
+import bcrypt from "bcryptjs";
+import { DEVICE_STATUS } from "../config/constants.js";
 
 export const preloadMasterData = async () => {
-    console.log("Iniciando precarga de datos maestros...");
-    
-    const DEPARTMENTS = [
-        "Gerencia General", 
-        "Capital Humano", 
-        "Mantenimiento", 
-        "Contraloría",
-        "Ventas", 
-        "Alimentos y Bebidas", 
-        "Animación y Deportes", 
-        "División Cuartos",
-        "Spa", 
-        "Golden Shores",
-        "TI", 
-    ];
+    console.log("🔄 Iniciando precarga de datos maestros (Multi-Hotel)...");
 
-    let deptMap = {};
-
-    console.log("Verificando Departamentos...");
-    for (const nombre of DEPARTMENTS) {
-        const dept = await prisma.department.upsert({
-            where: { nombre },
+    try {
+        // --------------------------------------------------------
+        // 1. CREAR EL HOTEL POR DEFECTO (TENANT 1)
+        // --------------------------------------------------------
+        console.log("🏨 Verificando Hotel Principal...");
+        
+        // Usamos upsert para no duplicar si se corre el script varias veces
+        const mainHotel = await prisma.hotel.upsert({
+            where: { codigo: "CPC-CUN" },
             update: {},
-            create: { nombre }
+            create: {
+                nombre: "Crown Paradise Club Cancún",
+                codigo: "CPC-CUN",
+                direccion: "Blvd. Kukulcan Km 18.5, Zona Hotelera, Cancún",
+                activo: true
+            }
         });
-        deptMap[dept.nombre] = dept.id;
-    }
+        
+        console.log(`✅ Hotel activo: ${mainHotel.nombre} (ID: ${mainHotel.id})`);
 
-    console.log("Verificando Áreas...");
-    const AREAS = [
-        // Gerencia General
-        { nombre: "Gerencia General", deptoName: "Gerencia General" },
+        // --------------------------------------------------------
+        // 2. CATÁLOGOS GLOBALES (Estándares para todos los hoteles)
+        // --------------------------------------------------------
+        console.log("⚙️ Cargando catálogos globales...");
 
-        // Recursos Humanos
-        { nombre: "Capital Humano", deptoName: "Capital Humano" },
+        const DEVICE_TYPES = ["Laptop", "Estación", "Servidor", "AIO", "Impresora", "Tablet"];
+        await Promise.all(DEVICE_TYPES.map(nombre => 
+            prisma.deviceType.upsert({ where: { nombre }, update: {}, create: { nombre } })
+        ));
 
-        // Mantenimiento
-        { nombre: "Mantenimiento", deptoName: "Mantenimiento" },
+        // Estados del equipo
+        const DEVICE_STATUSES = [DEVICE_STATUS.ACTIVE, DEVICE_STATUS.DISPOSED, "En Reparación", "Stock"];
+        await Promise.all(DEVICE_STATUSES.map(nombre => 
+            prisma.deviceStatus.upsert({ where: { nombre }, update: {}, create: { nombre } })
+        ));
 
-        // Contraloría
-        { nombre: "Sistemas", deptoName: "Contraloría" },
-        { nombre: "Contabilidad", deptoName: "Contraloría" },
-        { nombre: "Compras", deptoName: "Contraloría" },
-        { nombre: "Almacén", deptoName: "Contraloría" },
-        { nombre: "Costos", deptoName: "Contraloría" },
-        { nombre: "Calidad", deptoName: "Contraloría" },
+        // Sistemas Operativos
+        const OS_LIST = ["Windows 11", "Windows 10", "Windows 7", "Windows Server 2019", "Windows Server 2016", "macOS", "Linux"];
+        await Promise.all(OS_LIST.map(nombre => 
+            prisma.operatingSystem.upsert({ where: { nombre }, update: {}, create: { nombre } })
+        ));
 
-        // Ventas
-        { nombre: "Ventas", deptoName: "Ventas" },
-        { nombre: "Grupos", deptoName: "Ventas" },
-        { nombre: "Reservaciones", deptoName: "Ventas" },
-        { nombre: "Experiencia al Huesped", deptoName: "Ventas" },
+        // --------------------------------------------------------
+        // 3. ESTRUCTURA DEL HOTEL (Deptos y Áreas)
+        // --------------------------------------------------------
+        console.log("Kd🏗️ Construyendo estructura organizacional del hotel...");
 
-        // Alimentos y Bebidas
-        { nombre: "Alimentos y Bebidas", deptoName: "Alimentos y Bebidas" },
+        const DEPARTMENTS = [
+            "Gerencia General", "Capital Humano", "Mantenimiento", "Contraloría",
+            "Ventas", "Alimentos y Bebidas", "Animación y Deportes", "División Cuartos",
+            "Spa", "Golden Shores", "TI"
+        ];
 
-        // Animación y Deportes
-        { nombre: "Animación y Deportes", deptoName: "Animación y Deportes" },
+        let deptMap = {};
 
-        // División Cuartos
-        { nombre: "Recepción", deptoName: "División Cuartos" },
-        { nombre: "Concierge", deptoName: "División Cuartos" },
-        { nombre: "Ama de Llaves", deptoName: "División Cuartos" },
-        { nombre: "Areas Publicas", deptoName: "División Cuartos" },
-        { nombre: "Seguridad", deptoName: "División Cuartos" },
-        { nombre: "Lavanderia", deptoName: "División Cuartos" },
-        { nombre: "División Cuartos", deptoName: "División Cuartos" },
-        { nombre: "Telefonos", deptoName: "División Cuartos" },
-
-        // Spa
-        { nombre: "Spa", deptoName: "Spa" },
-
-        // Golden Shores
-        { nombre: "Golden Shores", deptoName: "Golden Shores" },
-
-        // TI
-        { nombre: "Business Center", deptoName: "TI" },
-        { nombre: "Servidores", deptoName: "TI" },
-        { nombre: "Backup", deptoName: "TI" },
-    ];
-
-    for (const area of AREAS) {
-        const deptId = deptMap[area.deptoName];
-        if (deptId) {
-            const existing = await prisma.area.findFirst({
+        for (const nombre of DEPARTMENTS) {
+            // Nota: Ahora buscamos por nombre Y hotelId
+            const dept = await prisma.department.upsert({
                 where: { 
-                    nombre: area.nombre,
-                    departamentoId: deptId
+                    nombre_hotelId: { nombre: nombre, hotelId: mainHotel.id } // Clave compuesta única
+                },
+                update: {},
+                create: { 
+                    nombre, 
+                    hotelId: mainHotel.id 
                 }
             });
+            deptMap[dept.nombre] = dept.id;
+        }
 
-            if (!existing) {
-                await prisma.area.create({
-                    data: {
+        const AREAS = [
+            { nombre: "Sistemas", deptoName: "Contraloría" },
+            { nombre: "Contabilidad", deptoName: "Contraloría" },
+            { nombre: "Compras", deptoName: "Contraloría" },
+            { nombre: "Almacén", deptoName: "Contraloría" },
+            { nombre: "Recepción", deptoName: "División Cuartos" },
+            { nombre: "Ama de Llaves", deptoName: "División Cuartos" },
+            { nombre: "Capital Humano", deptoName: "Capital Humano" },
+            { nombre: "Gerencia General", deptoName: "Gerencia General" },
+            // ... agrega más según necesites
+        ];
+
+        for (const area of AREAS) {
+            const deptId = deptMap[area.deptoName];
+            if (deptId) {
+                await prisma.area.upsert({
+                    where: {
+                        nombre_departamentoId_hotelId: { // Clave compuesta del Area
+                            nombre: area.nombre,
+                            departamentoId: deptId,
+                            hotelId: mainHotel.id
+                        }
+                    },
+                    update: {},
+                    create: {
                         nombre: area.nombre,
-                        departamentoId: deptId
+                        departamentoId: deptId,
+                        hotelId: mainHotel.id
                     }
                 });
             }
-        } else {
-            console.warn(`⚠️ No se encontró el departamento '${area.deptoName}' para el área '${area.nombre}'`);
         }
+
+        // --------------------------------------------------------
+        // 4. USUARIOS DEL SISTEMA (LOGIN)
+        // --------------------------------------------------------
+        console.log("👤 Creando usuarios base...");
+
+        // A) SUPER ADMIN (Global - Tú)
+        // No tiene hotelId porque ve todo
+        const superAdminExists = await prisma.userSistema.findUnique({ where: { username: "root" } });
+        if (!superAdminExists) {
+            const hashedPassword = await bcrypt.hash("admin123", 10);
+            await prisma.userSistema.create({
+                data: {
+                    username: "root",
+                    email: "dev@simet.com",
+                    password: hashedPassword,
+                    nombre: "Super Admin (Dev)",
+                    rol: "SUPER_ADMIN",
+                    hotelId: null // Global
+                }
+            });
+            console.log("✨ Usuario creado: root (Pass: admin123)");
+        }
+
+        // B) ADMIN DEL HOTEL (Jefe de Sistemas Local)
+        // Vinculado al hotel CPC-CUN
+        const hotelAdminExists = await prisma.userSistema.findUnique({ where: { username: "admin_cun" } });
+        if (!hotelAdminExists) {
+            const hashedPassword = await bcrypt.hash("crown123", 10);
+            await prisma.userSistema.create({
+                data: {
+                    username: "admin_cun",
+                    email: "sistemas.cun@crownparadise.com",
+                    password: hashedPassword,
+                    nombre: "Jefe Sistemas CUN",
+                    rol: "HOTEL_ADMIN",
+                    hotelId: mainHotel.id // Restringido a este hotel
+                }
+            });
+            console.log("✨ Usuario creado: admin_cun (Pass: crown123)");
+        }
+
+        console.log("✅ Precarga finalizada con éxito.");
+
+    } catch (error) {
+        console.error("❌ Error en precarga:", error);
     }
-    
-    console.log("Verificando Tipos de Dispositivo...");
-    const DEVICE_TYPES = ["Laptop", "Estación", "Servidor", "AIO"];
-    await Promise.all(
-        DEVICE_TYPES.map(nombre => 
-            prisma.deviceType.upsert({
-                where: { nombre },
-                update: {},
-                create: { nombre }
-            })
-        )
-    );
-    
-    console.log("Verificando Estados...");
-    // 👇 USO DE CONSTANTES
-    const DEVICE_STATUSES = [DEVICE_STATUS.ACTIVE, DEVICE_STATUS.DISPOSED];
-    await Promise.all(
-        DEVICE_STATUSES.map(nombre => 
-            prisma.deviceStatus.upsert({
-                where: { nombre },
-                update: {},
-                create: { nombre }
-            })
-        )
-    );
-    
-    console.log("Verificando Sistemas Operativos...");
-    const OS_LIST = ["Windows 11", "Windows 10", "Windows 7", "Windows Server", "Windows XP"];
-    
-    await Promise.all(
-        OS_LIST.map(nombre => 
-            prisma.operatingSystem.upsert({
-                where: { nombre },
-                update: {},
-                create: { nombre }
-            })
-        )
-    );
-
-    // Crear SuperAdmin
-    const superAdmin = await prisma.userSistema.findFirst({
-      where: { username: "admin", rol: ROLES.ADMIN } // 👈 CONSTANTE
-    });
-
-    if (!superAdmin) {
-      const bcrypt = await import("bcryptjs");
-      const hashedPassword = await bcrypt.default.hash("admin", 10);
-      const user = await prisma.userSistema.create({
-        data: {
-          username: "admin",
-          email: "admin@simet.cpc",
-          password: hashedPassword,
-          nombre: "Admin",
-          rol: ROLES.ADMIN, // 👈 CONSTANTE
-        },
-      });
-    } 
 };
