@@ -142,7 +142,6 @@ export const preloadMasterData = async () => {
                     password: hashedPassword,
                     nombre: "Root",
                     rol: ROLES.ROOT,
-                    hotelId: null // Acceso Global
                 }
             });
             console.log("✅ Usuario ROOT creado con éxito.");

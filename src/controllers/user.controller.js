@@ -125,7 +125,11 @@ export const exportUsers = async (req, res, next) => {
 export const importUsers = async (req, res, next) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const result = await userService.importUsersFromExcel(req.file.buffer, req.user);
+      
+      // 🔥 CORRECCIÓN: Leemos el hotelId del body (enviado por el frontend)
+      const targetHotelId = req.body.hotelId ? Number(req.body.hotelId) : null;
+
+      const result = await userService.importUsersFromExcel(req.file.buffer, req.user, targetHotelId);
       res.json(result);
     } catch (error) {
       next(error);

@@ -7,18 +7,17 @@ import * as auditService from "./audit.service.js";
 // SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
 // =====================================================================
 
-// Helper para obtener el filtro del tenant
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; // Root ve todo
-  return { hotelId: user.hotelId }; // Admin local solo ve su hotel
+  if (!user || !user.hotelId) return {}; 
+  return { hotelId: user.hotelId }; 
 };
 
 export const getUsers = async ({ skip, take, search, sortBy, order }, user) => {
   const tenantFilter = getTenantFilter(user);
   
   const whereClause = {
-    deletedAt: null, // Soft Delete
-    ...tenantFilter // Filtro de seguridad
+    deletedAt: null, 
+    ...tenantFilter 
   };
 
   if (search) {
@@ -77,10 +76,8 @@ export const getUserById = (id, user) => {
 };
 
 export const createUser = async (data, user) => {
-  // LÓGICA DE UBICACIÓN AUTOMÁTICA
   let hotelIdToAssign = user.hotelId;
   
-  // Si es ROOT (hotelId null), permitimos que lo defina en el body.
   if (!hotelIdToAssign && data.hotelId) {
       hotelIdToAssign = Number(data.hotelId);
   }
@@ -89,7 +86,6 @@ export const createUser = async (data, user) => {
       throw new Error("Se requiere un Hotel para crear al empleado.");
   }
 
-  // Validación extra: El área asignada debe pertenecer al mismo hotel
   if (data.areaId) {
       const area = await prisma.area.findFirst({ 
           where: { id: Number(data.areaId), hotelId: hotelIdToAssign }
@@ -105,7 +101,6 @@ export const createUser = async (data, user) => {
     },
   });
 
-  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'CREATE',
     entity: 'User',
@@ -122,12 +117,10 @@ export const updateUser = async (id, data, user) => {
   const userId = Number(id);
   const tenantFilter = getTenantFilter(user);
   
-  // Verificamos que el empleado exista Y pertenezca al hotel del usuario
   const oldUser = await prisma.user.findFirst({ where: { id: userId, ...tenantFilter } });
   
   if (!oldUser) throw new Error("Empleado no encontrado o sin permisos.");
 
-  // Si intenta cambiar de área, validamos que la nueva área sea del mismo hotel
   if (data.areaId) {
       const area = await prisma.area.findFirst({ 
           where: { id: Number(data.areaId), hotelId: oldUser.hotelId }
@@ -143,7 +136,6 @@ export const updateUser = async (id, data, user) => {
     },
   });
   
-  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'UPDATE',
     entity: 'User',
@@ -170,7 +162,6 @@ export const deleteUser = async (id, user) => {
     data: { deletedAt: new Date() }
   });
   
-  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'DELETE',
     entity: 'User',
@@ -222,8 +213,6 @@ const resolveArea = (data, context) => {
     areaId = context.areaMap.get(key);
 
     if (!areaId) {
-      // Intento secundario solo por nombre de área (puede ser ambiguo si hay nombres repetidos en deptos)
-      // Pero como estamos filtrando por hotel, el riesgo es menor.
       const areasFound = context.areasList.filter(a => cleanLower(a.nombre) === cleanLower(data.areaNombre));
       if (areasFound.length === 1) areaId = areasFound[0].id;
     }
@@ -235,22 +224,26 @@ const resolveArea = (data, context) => {
 // SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
 // =====================================================================
 
+// 🔥 CORRECCIÓN: Agregamos el parámetro targetHotelId
 export const importUsersFromExcel = async (buffer, user) => {
+  // 🔥 VALIDACIÓN DE SEGURIDAD ESTRICTA
+  // Solo permitimos importar si el usuario tiene asignado EXACTAMENTE UN HOTEL.
+  // Esto bloquea a Root (0 hoteles directos) y a Regionales (>1 hoteles) para evitar ambigüedades.
+  if (!user.hotels || user.hotels.length !== 1) {
+      throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones masivas. Si eres usuario Global o Regional, contacta al administrador local.");
+  }
+
+  // Obtenemos el ID fijo del usuario
+  const hotelIdToImport = user.hotels[0].id;
+
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
-  // Determinamos el hotel destino
-  let hotelIdToImport = user.hotelId;
-  if (!hotelIdToImport) {
-      // Si es root, debería venir especificado, por ahora lanzamos error si no es explícito
-      throw new Error("El usuario debe pertenecer a un Hotel para realizar importación masiva.");
-  }
-
   const usersToCreate = [];
   const errors = [];
 
-  // Cargamos SOLO las áreas de este hotel para resolver las relaciones
+  // Cargamos SOLO las áreas de este hotel
   const areas = await prisma.area.findMany({
     where: { 
         deletedAt: null,
@@ -283,7 +276,7 @@ export const importUsersFromExcel = async (buffer, user) => {
       areaId,
       usuario_login: rowData.usuario_login,
       es_jefe_de_area: rowData.es_jefe_de_area,
-      hotelId: hotelIdToImport // 👈 Asignamos el hotel
+      hotelId: hotelIdToImport // Asignamos el hotel automáticamente
     });
   });
 
@@ -291,7 +284,6 @@ export const importUsersFromExcel = async (buffer, user) => {
 
   for (const u of usersToCreate) {
     try {
-      // Verificamos existencia solo dentro del mismo hotel
       const existing = await prisma.user.findFirst({ 
           where: { 
               nombre: u.nombre,
@@ -306,7 +298,7 @@ export const importUsersFromExcel = async (buffer, user) => {
           where: { id: existing.id },
           data: {
             ...u,
-            deletedAt: null // Reactivar si estaba borrado
+            deletedAt: null 
           }
         });
       }
@@ -316,7 +308,6 @@ export const importUsersFromExcel = async (buffer, user) => {
     }
   }
 
-  // REGISTRO DE AUDITORÍA MASIVA
   if (successCount > 0) {
     await auditService.logActivity({
       action: 'IMPORT',

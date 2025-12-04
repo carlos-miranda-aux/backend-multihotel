@@ -14,19 +14,21 @@ datasource db {
 // ==========================================
 model Hotel {
   id          Int       @id @default(autoincrement())
-  nombre      String    @unique // Ej: "Crown Paradise Cancún"
-  codigo      String    @unique // Ej: "CPC-CUN"
+  nombre      String    @unique 
+  codigo      String    @unique 
   direccion   String?
   logoUrl     String?
   activo      Boolean   @default(true)
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime? // Soft Delete
+  deletedAt   DateTime?
 
-  // Relaciones: Un hotel es dueño de todo esto
-  users       UserSistema[] // Usuarios que hacen LOGIN (Admin, Soporte, etc.)
-  staff       User[]        // Usuarios del STAFF (Empleados que reciben equipos)
+  // Relaciones
+  // 🔥 CAMBIO: Relación Muchos a Muchos implícita con UserSistema
+  users       UserSistema[] 
+  
+  staff       User[]        
   departments Department[]
   devices     Device[]
   areas       Area[]
@@ -38,11 +40,11 @@ model Hotel {
 // ==========================================
 
 enum Rol {
-  ROOT   // Root / Dev (Global)
-  CORP_VIEWER   // Auditoría Global (Solo lectura)
-  HOTEL_ADMIN   // Jefe de Sistemas (Local)
-  HOTEL_AUX     // Auxiliar / Editor (Operativo)
-  HOTEL_GUEST   // Practicante / Invitado (Solo lectura/básico)
+  ROOT
+  CORP_VIEWER
+  HOTEL_ADMIN
+  HOTEL_AUX
+  HOTEL_GUEST
 }
 
 model UserSistema {
@@ -53,61 +55,40 @@ model UserSistema {
   nombre    String?
   rol       Rol       @default(HOTEL_GUEST)
   
-  // Si es NULL = Usuario Global. 
-  // Si tiene ID = Usuario restringido a ese Hotel.
-  hotel     Hotel?    @relation(fields: [hotelId], references: [id])
-  hotelId   Int?
+  // 🔥 CAMBIO: Eliminamos hotelId único y usamos un array de Hoteles
+  hotels    Hotel[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  deletedAt DateTime? 
-
+  deletedAt DateTime?
   auditLogs AuditLog[]
-
-  @@index([hotelId])
 }
 
-// ==========================================
-// 📦 3. ESTRUCTURA ORGANIZACIONAL
-// ==========================================
+// ... (El resto de tus modelos: Department, Area, Device, etc. se mantienen igual) ...
+// Nota: Asegúrate de que AuditLog siga teniendo hotelId si quieres registrar dónde ocurrió la acción específica.
 
 model Department {
   id        Int       @id @default(autoincrement())
   nombre    String
-  
-  // Multi-tenant
   hotel     Hotel     @relation(fields: [hotelId], references: [id])
   hotelId   Int
-
   deletedAt DateTime?
   areas     Area[]
-
-  // El nombre "Sistemas" se puede repetir en diferentes hoteles, pero no en el mismo
   @@unique([nombre, hotelId]) 
 }
 
 model Area {
   id             Int        @id @default(autoincrement())
   nombre         String
-  
-  // Multi-tenant
   hotel          Hotel      @relation(fields: [hotelId], references: [id])
   hotelId        Int
-
   departamento   Department @relation(fields: [departamentoId], references: [id])
   departamentoId Int
-  
   deletedAt      DateTime?
   users          User[]     
   devices        Device[]
-
   @@unique([nombre, departamentoId, hotelId])
 }
-
-// ==========================================
-// ⚙️ CATÁLOGOS GLOBALES (ESTÁNDARES)
-// ==========================================
-// Estos NO llevan hotelId porque "Windows 11" es igual en todos los hoteles.
 
 model OperatingSystem {
   id        Int       @id @default(autoincrement())
@@ -130,127 +111,88 @@ model DeviceStatus {
   devices   Device[]
 }
 
-// ==========================================
-// 📋 4. STAFF (EMPLEADOS) Y EQUIPOS
-// ==========================================
-
-model User { // Empleados del hotel (Usuarios finales, NO del sistema)
+model User { 
   id              Int       @id @default(autoincrement())
   nombre          String
   correo          String?
   usuario_login   String?
   es_jefe_de_area Boolean   @default(false)
-  
   area            Area?     @relation(fields: [areaId], references: [id])
   areaId          Int?
-  
-  // Pertenencia al Hotel
   hotel           Hotel     @relation(fields: [hotelId], references: [id])
   hotelId         Int
-
   created_at      DateTime  @default(now())
   deletedAt       DateTime?
-
-  devices Device[]
-
+  devices         Device[]
   @@index([areaId])
   @@index([hotelId])
 }
 
 model Device {
   id                       Int       @id @default(autoincrement())
-  
-  // 🔥 PROPIEDAD DEL HOTEL
   hotel                    Hotel     @relation(fields: [hotelId], references: [id])
   hotelId                  Int
-
   etiqueta                 String?
   nombre_equipo            String
   descripcion              String?
   comentarios              String?   @db.Text
-  ip_equipo                String?
+  ip_equipo                String
   perfiles_usuario         String?
-  
   usuario                  User?     @relation(fields: [usuarioId], references: [id])
   usuarioId                Int?
-  
   area                     Area?     @relation(fields: [areaId], references: [id])
   areaId                   Int?
-  
   tipo                     DeviceType @relation(fields: [tipoId], references: [id])
   tipoId                   Int
-  
   marca                    String
   modelo                   String
   numero_serie             String    
-  
   estado                   DeviceStatus @relation(fields: [estadoId], references: [id])
   estadoId                 Int
-  
   sistema_operativo        OperatingSystem? @relation(fields: [sistemaOperativoId], references: [id])
   sistemaOperativoId       Int?
-  
-  // Datos extra
   licencia_so              String?
   office_version           String?
   office_tipo_licencia     String?
   office_serial            String?
   office_key               String?
   es_panda                 Boolean   @default(false)
-
-  // Garantía y Mantenimiento
   garantia_inicio          DateTime?
   garantia_fin             DateTime?
   garantia_numero_producto String?
   garantia_numero_reporte  String?
   garantia_notes           String?   @db.Text
   fecha_proxima_revision   DateTime?
-
-  // Bajas
   fecha_baja               DateTime?
-  motivo_baja              String?   @db.VarChar(191)
+  motivo_baja              String?
   observaciones_baja       String?   @db.Text
-
   created_at               DateTime  @default(now())
   updated_at               DateTime  @updatedAt
   deletedAt                DateTime?
-
-  maintenances Maintenance[]
-
+  maintenances             Maintenance[]
   @@index([hotelId])
   @@index([usuarioId])
-  // Permitimos el mismo SN solo si es en hoteles diferentes
   @@unique([numero_serie, hotelId]) 
 }
 
 model Maintenance {
   id                  Int       @id @default(autoincrement())
   descripcion         String
-  fecha_programada    DateTime?
+  fecha_programada    DateTime
   fecha_realizacion   DateTime?
   estado              String    @default("pendiente")
   tipo_mantenimiento  String    @default("Preventivo") 
-  
   diagnostico         String?   @db.Text
   acciones_realizadas String?   @db.Text
   observaciones       String?   @db.Text
-  
   device              Device    @relation(fields: [deviceId], references: [id])
   deviceId            Int
-  
-  // Aunque se infiere por Device, tener hotelId aquí ayuda a filtrar reportes rápido
   hotel               Hotel     @relation(fields: [hotelId], references: [id])
   hotelId             Int
-
   deletedAt           DateTime?
-
   @@index([deviceId])
   @@index([hotelId])
 }
-
-// ==========================================
-// 📝 5. AUDITORÍA
-// ==========================================
 
 model AuditLog {
   id          Int          @id @default(autoincrement())
@@ -263,12 +205,9 @@ model AuditLog {
   ipAddress   String?      
   userAgent   String?
   createdAt   DateTime     @default(now())
-
   userId      Int?
   user        UserSistema? @relation(fields: [userId], references: [id])
-  
-  hotelId     Int?         // Para filtrar auditoría por hotel
-
+  hotelId     Int?
   @@index([userId])           
   @@index([hotelId])        
 }

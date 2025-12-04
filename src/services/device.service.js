@@ -520,21 +520,21 @@ const resolveForeignKeys = (data, context) => {
 // =====================================================================
 
 export const importDevicesFromExcel = async (buffer, user) => {
+  // 🔥 VALIDACIÓN ESTRICTA
+  if (!user.hotels || user.hotels.length !== 1) {
+      throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones de inventario.");
+  }
+
+  const hotelIdToImport = user.hotels[0].id;
+
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
-  const tenantFilter = getTenantFilter(user);
-
-  // 1. Cargamos datos CONTEXTUALES al hotel del usuario
+  // Cargamos contexto del hotel
   const [areas, users] = await Promise.all([
-    prisma.area.findMany({
-      where: { deletedAt: null, ...tenantFilter }, // 🛡️ Solo áreas del hotel
-      include: { departamento: true }
-    }),
-    prisma.user.findMany({ 
-        where: { deletedAt: null, ...tenantFilter } // 🛡️ Solo usuarios del hotel
-    }),
+    prisma.area.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport }, include: { departamento: true } }),
+    prisma.user.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport } }),
   ]);
 
   const context = {
@@ -550,60 +550,27 @@ export const importDevicesFromExcel = async (buffer, user) => {
   });
 
   const devicesToProcess = [];
-
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
-
     const rowData = extractRowData(row, headerMap);
     const foreignKeys = resolveForeignKeys(rowData, context);
-
     const finalNombre = rowData.nombre_equipo || `Equipo Fila ${rowNumber}`;
     const finalSerie = rowData.serie || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
 
     devicesToProcess.push({
       deviceData: {
-        etiqueta: rowData.etiqueta || null,
-        nombre_equipo: finalNombre,
-        numero_serie: finalSerie,
-        marca: rowData.marca,
-        modelo: rowData.modelo,
-        ip_equipo: rowData.ip_equipo,
-        descripcion: rowData.descripcion,
-        comentarios: rowData.comentarios || null,
-        perfiles_usuario: rowData.perfiles || null,
-        usuarioId: foreignKeys.usuarioId,
-        areaId: foreignKeys.areaId,
-        office_version: rowData.office_version || null,
-        office_tipo_licencia: rowData.office_licencia || null,
-        garantia_numero_producto: rowData.garantia_num_prod || null,
-        garantia_inicio: rowData.garantia_inicio,
-        garantia_fin: rowData.garantia_fin,
-        es_panda: rowData.es_panda,
+        etiqueta: rowData.etiqueta || null, nombre_equipo: finalNombre, numero_serie: finalSerie, marca: rowData.marca, modelo: rowData.modelo,
+        ip_equipo: rowData.ip_equipo, descripcion: rowData.descripcion, comentarios: rowData.comentarios || null, perfiles_usuario: rowData.perfiles || null,
+        usuarioId: foreignKeys.usuarioId, areaId: foreignKeys.areaId, office_version: rowData.office_version || null, office_tipo_licencia: rowData.office_licencia || null,
+        garantia_numero_producto: rowData.garantia_num_prod || null, garantia_inicio: rowData.garantia_inicio, garantia_fin: rowData.garantia_fin, es_panda: rowData.es_panda,
       },
-      meta: {
-        tipo: rowData.tipoStr,
-        estado: rowData.estadoStr,
-        os: rowData.osStr
-      }
+      meta: { tipo: rowData.tipoStr, estado: rowData.estadoStr, os: rowData.osStr }
     });
   });
 
   let successCount = 0;
   const errors = [];
-
-  const caches = {
-    types: new Map(),
-    status: new Map(),
-    os: new Map()
-  };
-  
-  // Asignamos el hotelId del usuario que importa
-  let hotelIdToImport = user.hotelId;
-  
-  if (!hotelIdToImport) {
-     // Si es ROOT sin hotel asignado, detenemos por seguridad
-     return { successCount: 0, errors: ["Para importar, inicia sesión como un Admin de Hotel específico."] };
-  }
+  const caches = { types: new Map(), status: new Map(), os: new Map() };
 
   for (const item of devicesToProcess) {
     try {
@@ -611,51 +578,21 @@ export const importDevicesFromExcel = async (buffer, user) => {
       const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, caches.status);
       const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, caches.os);
 
-      const finalData = {
-        ...item.deviceData,
-        tipoId,
-        estadoId,
-        sistemaOperativoId,
-        hotelId: hotelIdToImport // 🛡️ Asignamos el hotel
-      };
+      const finalData = { ...item.deviceData, tipoId, estadoId, sistemaOperativoId, hotelId: hotelIdToImport }; 
 
-      // Verificamos duplicados SOLO dentro del mismo hotel
-      const exists = await prisma.device.findFirst({ 
-          where: { 
-              numero_serie: finalData.numero_serie,
-              hotelId: hotelIdToImport 
-          } 
-      });
+      const exists = await prisma.device.findFirst({ where: { numero_serie: finalData.numero_serie, hotelId: hotelIdToImport } });
 
-      if (!exists) {
-        await prisma.device.create({ data: finalData });
-      } else {
-        await prisma.device.update({
-          where: { id: exists.id },
-          data: {
-            ...finalData,
-            deletedAt: null
-          }
-        });
-      }
+      if (!exists) { await prisma.device.create({ data: finalData }); } 
+      else { await prisma.device.update({ where: { id: exists.id }, data: { ...finalData, deletedAt: null } }); }
       successCount++;
-
     } catch (error) {
       errors.push(`Error en equipo '${item.deviceData.nombre_equipo}': ${error.message}`);
     }
   }
 
-  // 📝 REGISTRAR AUDITORÍA MASIVA
   if (successCount > 0) {
-    await auditService.logActivity({
-      action: 'IMPORT',
-      entity: 'Device',
-      entityId: 0,
-      details: `Importación masiva: ${successCount} equipos procesados en Hotel ID: ${hotelIdToImport}.`,
-      user: user
-    });
+    await auditService.logActivity({ action: 'IMPORT', entity: 'Device', entityId: 0, details: `Importación masiva: ${successCount} equipos en Hotel ID: ${hotelIdToImport}.`, user: user });
   }
-
   return { successCount, errors };
 };
 
