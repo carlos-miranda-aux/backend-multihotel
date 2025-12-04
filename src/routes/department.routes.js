@@ -1,19 +1,11 @@
 import { Router } from "express";
-import {
-  getDepartments,
-  getDepartment,
-  createDepartment,
-  updateDepartment,
-  deleteDepartment
-} from "../controllers/department.controller.js";
+import { getDepartments, getDepartment, createDepartment, updateDepartment, deleteDepartment } from "../controllers/department.controller.js";
 import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 import { ROLES } from "../config/constants.js";
 
 const router = Router();
-
-// Definición de permisos
 const READ_ALL = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
-const ADMIN_ONLY = [ROLES.ROOT, ROLES.HOTEL_ADMIN]; // Solo Admins crean/borran estructura
+const ADMIN_ONLY = [ROLES.ROOT, ROLES.HOTEL_ADMIN];
 
 router.get("/get", verifyToken, verifyRole(READ_ALL), getDepartments);
 router.get("/get/:id", verifyToken, verifyRole(READ_ALL), getDepartment);

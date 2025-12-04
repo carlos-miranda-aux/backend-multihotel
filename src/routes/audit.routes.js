@@ -4,8 +4,6 @@ import { verifyToken, verifyRole } from "../middlewares/auth.middleware.js";
 import { ROLES } from "../config/constants.js";
 
 const router = Router();
-
-// Solo Admins y Visualizadores Corporativos pueden ver la bitácora
 const AUDIT_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.CORP_VIEWER];
 
 router.get("/", verifyToken, verifyRole(AUDIT_ACCESS), getAuditLogs);

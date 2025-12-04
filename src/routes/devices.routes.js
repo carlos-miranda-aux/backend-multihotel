@@ -1,37 +1,27 @@
 import { Router } from "express";
 import multer from "multer";
 import {
-  getDevices,
-  getDevice,
-  createDevice,
-  updateDevice,
-  deleteDevice,
-  getAllActiveDeviceNames, 
-  exportInactiveDevices,
-  exportAllDevices,
-  importDevices,
-  exportCorrectiveAnalysis,
-  getPandaStatus,
-  getDashboardData
+  getDevices, getDevice, createDevice, updateDevice, deleteDevice,
+  getAllActiveDeviceNames, exportInactiveDevices, exportAllDevices,
+  importDevices, exportCorrectiveAnalysis, getPandaStatus, getDashboardData
 } from "../controllers/device.controller.js";
 import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 import { validateCreateDevice, validateUpdateDevice } from "../validators/device.validator.js";
-// 👇 Importamos los roles para evitar errores de dedo
-import { ROLES } from "../config/constants.js";
+import { ROLES } from "../config/constants.js"; // 👈 Importante
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
-// Grupos de acceso
-const ALL_READ = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
+// Permisos definidos
+const READ_ALL = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
 const EDIT_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX];
 const ADMIN_ONLY = [ROLES.ROOT, ROLES.HOTEL_ADMIN];
 
-router.get("/get", verifyToken, verifyRole(ALL_READ), getDevices);
-router.get("/get/all-names", verifyToken, verifyRole(ALL_READ), getAllActiveDeviceNames);
-router.get("/get/panda-status", verifyToken, verifyRole(ALL_READ), getPandaStatus); 
-router.get("/get/dashboard-stats", verifyToken, verifyRole(ALL_READ), getDashboardData);
-router.get("/get/:id", verifyToken, verifyRole(ALL_READ), getDevice);
+router.get("/get", verifyToken, verifyRole(READ_ALL), getDevices);
+router.get("/get/all-names", verifyToken, verifyRole(READ_ALL), getAllActiveDeviceNames);
+router.get("/get/panda-status", verifyToken, verifyRole(READ_ALL), getPandaStatus); 
+router.get("/get/dashboard-stats", verifyToken, verifyRole(READ_ALL), getDashboardData);
+router.get("/get/:id", verifyToken, verifyRole(READ_ALL), getDevice);
 
 router.post("/post", verifyToken, verifyRole(EDIT_ACCESS), validateCreateDevice, createDevice);
 router.put("/put/:id", verifyToken, verifyRole(EDIT_ACCESS), validateUpdateDevice, updateDevice);

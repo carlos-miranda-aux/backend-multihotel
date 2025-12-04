@@ -7,10 +7,9 @@ import { ROLES } from "../config/constants.js";
 
 const router = Router();
 
-// Rutas públicas
 router.post("/login", login);
 
-// Gestión de Usuarios del Sistema (Solo Admins)
+// Solo Admins pueden gestionar usuarios del sistema
 const ADMIN_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN];
 
 router.get("/get", verifyToken, verifyRole(ADMIN_ACCESS), getUsers);
