@@ -21,7 +21,7 @@ export const getUsers = async (req, res, next) => {
     const order = req.query.order || "asc";
     const skip = (page - 1) * limit;
 
-    // 👈 PASAMOS req.user para filtrar (Admin Local solo ve sus usuarios)
+    // 👈 CORRECCIÓN: Pasamos req.user para filtrar por hotel
     const { users, totalCount } = await authService.getUsers({ 
         skip, 
         take: limit, 
@@ -42,7 +42,7 @@ export const getUsers = async (req, res, next) => {
 
 export const getUser = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
+    // 👈 CORRECCIÓN: Pasamos req.user
     const user = await authService.getUserById(req.params.id, req.user);
     if (!user) return res.status(404).json({ message: "Usuario no encontrado o acceso denegado" });
     res.json(user);
@@ -53,12 +53,11 @@ export const getUser = async (req, res, next) => {
 
 export const deleteUser = async (req, res, next) => {
   try {
-    // Primero verificamos si existe (la validación de permisos fuerte está en el servicio)
     const userToDelete = await prisma.userSistema.findUnique({ where: { id: Number(req.params.id) } });
     if (!userToDelete) return res.status(404).json({ message: "Usuario no encontrado" });
     if (userToDelete.username === "root") return res.status(403).json({ error: "No se puede eliminar al usuario ROOT" });
     
-    // 👈 PASAMOS req.user
+    // 👈 CORRECCIÓN: Pasamos req.user
     await authService.deleteUser(req.params.id, req.user);
     res.json({ message: "Usuario eliminado correctamente" });
   } catch (error) { 
@@ -68,7 +67,7 @@ export const deleteUser = async (req, res, next) => {
 
 export const updateUserController = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
+    // 👈 CORRECCIÓN: Pasamos req.user
     const updatedUser = await authService.updateUser(req.params.id, req.body, req.user);
     res.json({ message: "Usuario actualizado", user: updatedUser });
   } catch (error) { 
@@ -78,7 +77,7 @@ export const updateUserController = async (req, res, next) => {
 
 export const createUser = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user (El servicio asignará el hotelId automáticamente si no es ROOT)
+    // 👈 CORRECCIÓN: Pasamos req.user
     const user = await authService.registerUser(req.body, req.user);
     res.status(201).json(user);
   } catch (error) { 
@@ -88,7 +87,7 @@ export const createUser = async (req, res, next) => {
 
 export const exportSystemUsers = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user para exportar solo los del hotel correspondiente
+    // 👈 CORRECCIÓN: Pasamos req.user
     const { users } = await authService.getUsers({ skip: 0, take: undefined }, req.user); 
     
     const workbook = new ExcelJS.Workbook();
@@ -100,7 +99,7 @@ export const exportSystemUsers = async (req, res, next) => {
       { header: "Username", key: "username", width: 25 },
       { header: "Email", key: "email", width: 30 },
       { header: "Rol", key: "rol", width: 15 },
-      { header: "Hotel ID", key: "hotelId", width: 15 }, // Útil para ver asignación
+      { header: "Hotel ID", key: "hotelId", width: 15 },
     ];
     
     users.forEach((user) => {
