@@ -11,7 +11,7 @@ export const ROLES = {
 
 export const DEVICE_STATUS = {
   ACTIVE: "Activo",
-  INACTIVE: "Inactivo",
+  DISPOSED: "Inactivo",
 };
 
 export const MAINTENANCE_STATUS = {

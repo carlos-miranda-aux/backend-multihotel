@@ -64,6 +64,10 @@ const STANDARD_STRUCTURE = [
     {
         depto: "Ventas",
         areas: ["Ventas", "Reservaciones"]
+    },
+    {
+        depto: "Golden Shores",
+        areas: ["Golden Shores"]
     }
 ];
 

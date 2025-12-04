@@ -4,10 +4,12 @@ import ExcelJS from "exceljs";
 import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js";
 import * as auditService from "./audit.service.js"; 
 
-// Helper para construir el filtro de tenant
+// =====================================================================
+// HELPER DE SEGURIDAD MULTI-TENANT
+// =====================================================================
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; // Si es Global (Root/Auditor), ve todo
-  return { hotelId: user.hotelId }; // Si tiene hotelId, se filtra
+  if (!user || !user.hotelId) return {}; // Root (Global) ve todo
+  return { hotelId: user.hotelId }; // Admin Local solo ve su hotel
 };
 
 // =====================================================================
@@ -18,7 +20,7 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
   const tenantFilter = getTenantFilter(user);
 
   const whereClause = {
-    ...tenantFilter, // 🛡️ FILTRO MULTI-TENANT
+    ...tenantFilter, // 🛡️ FILTRO DE SEGURIDAD
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
     deletedAt: null 
   };
@@ -100,7 +102,7 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
 };
 
 export const createDevice = async (data, user) => {
-  // 🛡️ Asignar el hotel automáticamente
+  // 🛡️ ASIGNACIÓN AUTOMÁTICA DE HOTEL
   let hotelIdToAssign = user.hotelId;
   
   // Si es ROOT y no tiene hotelId en el token, debe venir en la data
@@ -150,11 +152,13 @@ export const updateDevice = async (id, data, user) => {
   const disposedStatusId = disposedStatus?.id;
 
   if (disposedStatusId) {
+    // Reactivación
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
       data.fecha_baja = null;
       data.motivo_baja = null;
       data.observaciones_baja = null;
     }
+    // Baja
     else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
       data.fecha_baja = new Date();
     }
@@ -240,7 +244,8 @@ export const getAllActiveDeviceNames = (user) => {
       id: true,
       etiqueta: true,
       nombre_equipo: true,
-      tipo: { select: { nombre: true } }
+      tipo: { select: { nombre: true } },
+      hotelId: true // Útil para el selector del Root
     },
     orderBy: { etiqueta: 'asc' }
   });
@@ -345,12 +350,18 @@ export const getDashboardStats = async (user) => {
     expiredWarranty,
     riskWarranty,
     currentMonthDisposals,
+    totalStaff, // 👈 DATO NUEVO: Conteo de personal
     warrantyAlerts
   ] = await prisma.$transaction([
+    // 1. Activos
     prisma.device.count({ where: activeFilter }),
+    // 2. Panda
     prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
+    // 3. Garantía vencida
     prisma.device.count({ where: { ...activeFilter, garantia_fin: { lt: today.toISOString() } } }),
+    // 4. Garantía riesgo
     prisma.device.count({ where: { ...activeFilter, garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } } }),
+    // 5. Bajas del mes
     prisma.device.count({
       where: {
         estado: { nombre: DEVICE_STATUS.DISPOSED },
@@ -359,6 +370,14 @@ export const getDashboardStats = async (user) => {
         ...tenantFilter // 🛡️ Seguridad
       }
     }),
+    // 6. Total Staff (Usuarios finales)
+    prisma.user.count({
+        where: {
+            deletedAt: null,
+            ...tenantFilter // 🛡️ Seguridad (Solo personal de mi hotel)
+        }
+    }),
+    // 7. Lista de alertas de garantía
     prisma.device.findMany({
       where: {
         ...activeFilter,
@@ -385,7 +404,8 @@ export const getDashboardStats = async (user) => {
       totalActiveDevices: totalActive,
       devicesWithPanda: withPanda,
       devicesWithoutPanda: withoutPanda,
-      monthlyDisposals: currentMonthDisposals
+      monthlyDisposals: currentMonthDisposals,
+      totalStaff: totalStaff // 👈 Se envía al frontend
     },
     warrantyStats: {
       expired: expiredWarranty,
@@ -474,7 +494,6 @@ const extractRowData = (row, headerMap) => {
   };
 };
 
-// Necesitamos el hotelId del usuario para filtrar las búsquedas en los mapas
 const resolveForeignKeys = (data, context) => {
   let usuarioId = null;
   if (data.responsableLogin) {
@@ -485,11 +504,9 @@ const resolveForeignKeys = (data, context) => {
   }
 
   let areaId = null;
-  // Intentamos match exacto con depto
   if (data.areaStr && data.deptoStr) {
     areaId = context.areaMap.get(`${cleanLower(data.areaStr)}|${cleanLower(data.deptoStr)}`);
   }
-  // Fallback solo nombre de area
   if (!areaId && data.areaStr) {
     const possibleArea = context.areasList.find(a => cleanLower(a.nombre) === cleanLower(data.areaStr));
     if (possibleArea) areaId = possibleArea.id;
@@ -506,7 +523,7 @@ export const importDevicesFromExcel = async (buffer, user) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
-  
+
   const tenantFilter = getTenantFilter(user);
 
   // 1. Cargamos datos CONTEXTUALES al hotel del usuario
@@ -582,23 +599,14 @@ export const importDevicesFromExcel = async (buffer, user) => {
   
   // Asignamos el hotelId del usuario que importa
   let hotelIdToImport = user.hotelId;
+  
   if (!hotelIdToImport) {
-     // Si es root, debería venir en algún lado o fallar, para simplificar, 
-     // en importación masiva por root asumimos que no se soporta o se requiere un header especial.
-     // Por seguridad, si no hay hotelId en usuario, detenemos importación masiva de equipos 
-     // (a menos que quieras permitir importar a "null" o a un hotel default).
-     // Por ahora, lanzamos error si es Root puro sin seleccionar hotel contexto.
-     // Sin embargo, si es Root, el filtro getTenantFilter devuelve {}, asi que esto podría mezclar datos.
-     // Recomendación: Root debe loguearse como un usuario específico de hotel o pasar un header.
-     // Para MVP, asumimos que importación solo la hacen Admins Locales.
+     // Si es ROOT sin hotel asignado, detenemos por seguridad
+     return { successCount: 0, errors: ["Para importar, inicia sesión como un Admin de Hotel específico."] };
   }
 
   for (const item of devicesToProcess) {
     try {
-      if (!hotelIdToImport) {
-         throw new Error("El usuario Root debe especificar un Hotel para importar (Funcionalidad pendiente). Usa un Admin Local.");
-      }
-
       const tipoId = await getOrCreateCatalog('deviceType', item.meta.tipo, caches.types);
       const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, caches.status);
       const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, caches.os);
