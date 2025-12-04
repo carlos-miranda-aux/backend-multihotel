@@ -1,11 +1,13 @@
-// src/routes/audit.routes.js
 import { Router } from "express";
 import { getAuditLogs } from "../controllers/audit.controller.js";
 import { verifyToken, verifyRole } from "../middlewares/auth.middleware.js";
+import { ROLES } from "../config/constants.js";
 
 const router = Router();
 
-// GET /api/audit -> Protegido solo para ADMIN
-router.get("/", verifyToken, verifyRole(["ADMIN", "EDITOR"]), getAuditLogs);
+// Solo Admins y Visualizadores Corporativos pueden ver la bitácora
+const AUDIT_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.CORP_VIEWER];
+
+router.get("/", verifyToken, verifyRole(AUDIT_ACCESS), getAuditLogs);
 
 export default router;

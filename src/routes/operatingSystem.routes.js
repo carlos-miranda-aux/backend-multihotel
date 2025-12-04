@@ -1,4 +1,3 @@
-// src/routes/operatingSystem.routes.js
 import { Router } from "express";
 import {
   getOperatingSystems,
@@ -6,15 +5,19 @@ import {
   createOperatingSystem,
   updateOperatingSystem,
   deleteOperatingSystem
-} from "../controllers/operatingSystem.controller.js"; // 👈 Nombres corregidos
-import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js"
+} from "../controllers/operatingSystem.controller.js";
+import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
+import { ROLES } from "../config/constants.js";
 
 const router = Router();
 
-router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getOperatingSystems);
-router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getOperatingSystem);
-router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createOperatingSystem);
-router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]), updateOperatingSystem);
-router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteOperatingSystem);
+const READ_ALL = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
+const CATALOG_ADMIN = [ROLES.ROOT, ROLES.HOTEL_ADMIN];
+
+router.get("/get", verifyToken, verifyRole(READ_ALL), getOperatingSystems);
+router.get("/get/:id", verifyToken, verifyRole(READ_ALL), getOperatingSystem);
+router.post("/post", verifyToken, verifyRole(CATALOG_ADMIN), createOperatingSystem);
+router.put("/put/:id", verifyToken, verifyRole(CATALOG_ADMIN), updateOperatingSystem);
+router.delete("/delete/:id", verifyToken, verifyRole(CATALOG_ADMIN), deleteOperatingSystem);
 
 export default router;

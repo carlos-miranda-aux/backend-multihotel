@@ -1,4 +1,3 @@
-// src/routes/devices.routes.js
 import { Router } from "express";
 import multer from "multer";
 import {
@@ -13,43 +12,34 @@ import {
   importDevices,
   exportCorrectiveAnalysis,
   getPandaStatus,
-  getDashboardData // 👈 IMPORTADO
+  getDashboardData
 } from "../controllers/device.controller.js";
 import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 import { validateCreateDevice, validateUpdateDevice } from "../validators/device.validator.js";
+// 👇 Importamos los roles para evitar errores de dedo
+import { ROLES } from "../config/constants.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
-router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevices);
-router.get("/get/all-names", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getAllActiveDeviceNames);
-router.get("/get/panda-status", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getPandaStatus); 
+// Grupos de acceso
+const ALL_READ = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
+const EDIT_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX];
+const ADMIN_ONLY = [ROLES.ROOT, ROLES.HOTEL_ADMIN];
 
-// 👇 NUEVA RUTA OPTIMIZADA (ANTES DE /get/:id)
-router.get("/get/dashboard-stats", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDashboardData);
+router.get("/get", verifyToken, verifyRole(ALL_READ), getDevices);
+router.get("/get/all-names", verifyToken, verifyRole(ALL_READ), getAllActiveDeviceNames);
+router.get("/get/panda-status", verifyToken, verifyRole(ALL_READ), getPandaStatus); 
+router.get("/get/dashboard-stats", verifyToken, verifyRole(ALL_READ), getDashboardData);
+router.get("/get/:id", verifyToken, verifyRole(ALL_READ), getDevice);
 
-router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getDevice);
+router.post("/post", verifyToken, verifyRole(EDIT_ACCESS), validateCreateDevice, createDevice);
+router.put("/put/:id", verifyToken, verifyRole(EDIT_ACCESS), validateUpdateDevice, updateDevice);
+router.delete("/delete/:id", verifyToken, verifyRole(ADMIN_ONLY), deleteDevice);
 
-router.post("/post", 
-    verifyToken, 
-    verifyRole(["ADMIN", "EDITOR"]), 
-    validateCreateDevice, 
-    createDevice
-);
-
-router.put("/put/:id", 
-    verifyToken, 
-    verifyRole(["ADMIN", "EDITOR"]), 
-    validateUpdateDevice,
-    updateDevice
-);
-
-router.delete("/delete/:id", verifyToken, verifyRole(["ADMIN"]), deleteDevice);
-router.get("/export/inactivos", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportInactiveDevices);
-router.get("/export/all", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportAllDevices);
-
-router.post("/import", verifyToken, verifyRole(["ADMIN"]), upload.single("file"), importDevices);
-
-router.get("/export/corrective-analysis", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportCorrectiveAnalysis);
+router.get("/export/inactivos", verifyToken, verifyRole(EDIT_ACCESS), exportInactiveDevices);
+router.get("/export/all", verifyToken, verifyRole(EDIT_ACCESS), exportAllDevices);
+router.post("/import", verifyToken, verifyRole(ADMIN_ONLY), upload.single("file"), importDevices);
+router.get("/export/corrective-analysis", verifyToken, verifyRole(EDIT_ACCESS), exportCorrectiveAnalysis);
 
 export default router;

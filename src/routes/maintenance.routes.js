@@ -8,16 +8,20 @@ import {
   exportMaintenances,
   exportIndividualMaintenance
 } from "../controllers/maintenance.controller.js";
-import {verifyRole, verifyToken} from "../middlewares/auth.middleware.js"
+import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
+import { ROLES } from "../config/constants.js";
 
 const router = Router();
 
-router.get("/get", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getMaintenances);
-router.get("/get/:id", verifyToken, verifyRole(["ADMIN", "EDITOR", "USER"]), getMaintenance);
-router.post("/post", verifyToken, verifyRole(["ADMIN", "EDITOR"]), createMaintenance);
-router.put("/put/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]), updateMaintenance);
-router.delete("/delete/:id",  verifyToken, verifyRole(["ADMIN", "EDITOR"]),deleteMaintenance);
-router.get("/export/all", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportMaintenances);
-router.get("/export/individual/:id", verifyToken, verifyRole(["ADMIN", "EDITOR"]), exportIndividualMaintenance);
+const ALL_READ = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
+const EDIT_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX];
+
+router.get("/get", verifyToken, verifyRole(ALL_READ), getMaintenances);
+router.get("/get/:id", verifyToken, verifyRole(ALL_READ), getMaintenance);
+router.post("/post", verifyToken, verifyRole(EDIT_ACCESS), createMaintenance);
+router.put("/put/:id", verifyToken, verifyRole(EDIT_ACCESS), updateMaintenance);
+router.delete("/delete/:id", verifyToken, verifyRole(EDIT_ACCESS), deleteMaintenance);
+router.get("/export/all", verifyToken, verifyRole(EDIT_ACCESS), exportMaintenances);
+router.get("/export/individual/:id", verifyToken, verifyRole(EDIT_ACCESS), exportIndividualMaintenance);
 
 export default router;
