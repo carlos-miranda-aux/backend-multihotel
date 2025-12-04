@@ -1,9 +1,14 @@
-// src/services/area.service.js
 import prisma from "../../src/PrismaClient.js";
-import * as auditService from "./audit.service.js"; // 👈 IMPORTAR
+import * as auditService from "./audit.service.js"; 
 
-export const getAreas = async ({ skip, take, sortBy, order }) => {
+const getTenantFilter = (user) => {
+  if (!user || !user.hotelId) return {}; 
+  return { hotelId: user.hotelId };
+};
+
+export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   let orderBy = { nombre: 'asc' };
+  const tenantFilter = getTenantFilter(user);
   
   if (sortBy) {
       if (sortBy.includes('.')) {
@@ -14,14 +19,15 @@ export const getAreas = async ({ skip, take, sortBy, order }) => {
       }
   }
 
-  const whereClause = { deletedAt: null };
+  const whereClause = { 
+      deletedAt: null,
+      ...tenantFilter
+  };
 
   const [areas, totalCount] = await prisma.$transaction([
     prisma.area.findMany({
       where: whereClause,
-      include: {
-        departamento: true, 
-      },
+      include: { departamento: true },
       skip: skip,
       take: take,
       orderBy: orderBy
@@ -32,34 +38,43 @@ export const getAreas = async ({ skip, take, sortBy, order }) => {
   return { areas, totalCount };
 };
 
-export const getAllAreas = () => {
+export const getAllAreas = (user) => {
+  const tenantFilter = getTenantFilter(user);
   return prisma.area.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, ...tenantFilter },
     include: { departamento: true },
-    orderBy: [
-        { departamento: { nombre: 'asc' } },
-        { nombre: 'asc' }
-      ]
+    orderBy: [ { departamento: { nombre: 'asc' } }, { nombre: 'asc' } ]
   });
 };
 
-export const getAreaById = (id) => prisma.area.findFirst({
-    where: { 
-        id: Number(id),
-        deletedAt: null 
-    },
-    include: { departamento: true },
-});
+export const getAreaById = (id, user) => {
+    const tenantFilter = getTenantFilter(user);
+    return prisma.area.findFirst({
+        where: { id: Number(id), deletedAt: null, ...tenantFilter },
+        include: { departamento: true },
+    });
+};
 
-export const createArea = async (data, user) => { // 👈 Recibe 'user'
+export const createArea = async (data, user) => {
+    // 🛡️ ASIGNACIÓN AUTOMÁTICA
+    let hotelIdToAssign = user.hotelId;
+    if (!hotelIdToAssign && data.hotelId) hotelIdToAssign = Number(data.hotelId);
+    if (!hotelIdToAssign) throw new Error("Se requiere un Hotel para crear el área.");
+
+    // Validar que el departamento pertenezca al mismo hotel
+    const dept = await prisma.department.findFirst({ 
+        where: { id: Number(data.departamentoId), hotelId: hotelIdToAssign }
+    });
+    if (!dept) throw new Error("El departamento seleccionado no existe o no pertenece a tu hotel.");
+
     const newArea = await prisma.area.create({
       data: {
         nombre: data.nombre,
-        departamentoId: Number(data.departamentoId)
+        departamentoId: Number(data.departamentoId),
+        hotelId: hotelIdToAssign
       }
     });
 
-    // 📝 AUDITORÍA
     await auditService.logActivity({
         action: 'CREATE',
         entity: 'Area',
@@ -72,19 +87,29 @@ export const createArea = async (data, user) => { // 👈 Recibe 'user'
     return newArea;
 };
 
-export const updateArea = async (id, data, user) => { // 👈 Recibe 'user'
+export const updateArea = async (id, data, user) => {
     const areaId = Number(id);
-    const oldArea = await prisma.area.findFirst({ where: { id: areaId } });
+    const tenantFilter = getTenantFilter(user);
+
+    const oldArea = await prisma.area.findFirst({ where: { id: areaId, ...tenantFilter } });
+    if (!oldArea) throw new Error("Área no encontrada o sin permisos.");
+
+    // Si cambia de departamento, validar que el nuevo depto sea del mismo hotel
+    if (data.departamentoId) {
+        const dept = await prisma.department.findFirst({ 
+            where: { id: Number(data.departamentoId), hotelId: oldArea.hotelId }
+        });
+        if (!dept) throw new Error("El departamento destino no es válido.");
+    }
 
     const updatedArea = await prisma.area.update({
       where: { id: areaId },
       data: {
         nombre: data.nombre,
-        departamentoId: Number(data.departamentoId)
+        departamentoId: data.departamentoId ? Number(data.departamentoId) : undefined
       },
     });
 
-    // 📝 AUDITORÍA
     await auditService.logActivity({
         action: 'UPDATE',
         entity: 'Area',
@@ -98,23 +123,25 @@ export const updateArea = async (id, data, user) => { // 👈 Recibe 'user'
     return updatedArea;
 };
 
-export const deleteArea = async (id, user) => { // 👈 Recibe 'user'
+export const deleteArea = async (id, user) => {
     const areaId = Number(id);
-    const oldArea = await prisma.area.findFirst({ where: { id: areaId } });
+    const tenantFilter = getTenantFilter(user);
+
+    const oldArea = await prisma.area.findFirst({ where: { id: areaId, ...tenantFilter } });
+    if (!oldArea) throw new Error("Área no encontrada o sin permisos.");
 
     const deleted = await prisma.area.update({ 
         where: { id: areaId },
         data: { deletedAt: new Date() }
     });
 
-    // 📝 AUDITORÍA
     await auditService.logActivity({
         action: 'DELETE',
         entity: 'Area',
         entityId: areaId,
         oldData: oldArea,
         user: user,
-        details: `Área eliminada (Soft Delete)`
+        details: `Área eliminada`
     });
 
     return deleted;

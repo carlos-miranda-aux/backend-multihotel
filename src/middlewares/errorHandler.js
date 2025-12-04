@@ -1,7 +1,7 @@
 // src/middlewares/errorHandler.js
 
 export const errorHandler = (err, req, res, next) => {
-  // 1. Log técnico para el desarrollador (se mantiene en servidor)
+  // 1. Log técnico para el desarrollador (se mantiene en consola del servidor)
   console.error("🔥 Error del Sistema:", err);
 
   // 2. Manejo de Errores de Prisma (Base de Datos)
@@ -10,7 +10,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err.code === 'P2002') {
     const target = err.meta?.target;
     
-    // Mapeo de campos específicos a mensajes amigables
+    // Mapeo de campos específicos a mensajes amigables para el usuario
     if (String(target).includes('email') || String(target).includes('correo')) {
         return res.status(400).json({ error: "Este correo electrónico ya está registrado en el sistema." });
     }
@@ -18,7 +18,7 @@ export const errorHandler = (err, req, res, next) => {
         return res.status(400).json({ error: "Este nombre de usuario ya está en uso. Intenta con otro." });
     }
     if (String(target).includes('numero_serie')) {
-        return res.status(400).json({ error: "Ya existe un equipo registrado con este Número de Serie." });
+        return res.status(400).json({ error: "Ya existe un equipo registrado con este Número de Serie en este hotel." });
     }
     if (String(target).includes('etiqueta')) {
         return res.status(400).json({ error: "Ya existe un equipo con esta Etiqueta." });
@@ -40,24 +40,24 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // P2025: Registro no encontrado
+  // P2025: Registro no encontrado (lanzado por Prisma en updates/deletes)
   if (err.code === 'P2025') {
     return res.status(404).json({ error: "La información solicitada no existe o ya fue eliminada." });
   }
 
-  // 3. Errores lanzados manualmente (throw new Error)
+  // 3. Errores lanzados manualmente (throw new Error) en los servicios
   if (err.message) {
-      // Filtramos mensajes técnicos comunes para no mostrarlos crudos
+      // Filtramos mensajes técnicos comunes de librerías para no mostrarlos crudos
       if (err.message.includes("is not valid")) {
           return res.status(400).json({ error: "Uno de los datos ingresados no tiene el formato correcto." });
       }
       
-      // Si el mensaje parece hecho por nosotros (ej. "Usuario no encontrado"), lo mostramos
+      // Si el mensaje es legible (ej. "Usuario no encontrado"), lo enviamos al front
       return res.status(400).json({ error: err.message });
   }
 
   // 4. Error Genérico (500)
-  // Mensaje seguro para el usuario final
+  // Mensaje seguro para el usuario final si todo lo demás falla
   res.status(500).json({
     error: "Ocurrió un problema inesperado en el servidor. Por favor intenta más tarde o contacta a soporte.",
   });

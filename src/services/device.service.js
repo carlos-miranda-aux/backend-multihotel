@@ -2,16 +2,25 @@
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js";
-import * as auditService from "./audit.service.js"; // 👈 IMPORTAR AUDITORÍA
+import * as auditService from "./audit.service.js"; 
+
+// Helper para construir el filtro de tenant
+const getTenantFilter = (user) => {
+  if (!user || !user.hotelId) return {}; // Si es Global (Root/Auditor), ve todo
+  return { hotelId: user.hotelId }; // Si tiene hotelId, se filtra
+};
 
 // =====================================================================
 // SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
 // =====================================================================
 
-export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }) => {
+export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }, user) => {
+  const tenantFilter = getTenantFilter(user);
+
   const whereClause = {
+    ...tenantFilter, // 🛡️ FILTRO MULTI-TENANT
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-    deletedAt: null // 👈 Soft Delete
+    deletedAt: null 
   };
 
   if (search) {
@@ -91,9 +100,25 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
 };
 
 export const createDevice = async (data, user) => {
-  const newDevice = await prisma.device.create({ data });
+  // 🛡️ Asignar el hotel automáticamente
+  let hotelIdToAssign = user.hotelId;
+  
+  // Si es ROOT y no tiene hotelId en el token, debe venir en la data
+  if (!hotelIdToAssign && data.hotelId) {
+      hotelIdToAssign = Number(data.hotelId);
+  }
+  
+  if (!hotelIdToAssign) {
+      throw new Error("Error crítico: No se puede crear un dispositivo sin asignar un Hotel (Tenant).");
+  }
 
-  // 📝 REGISTRAR AUDITORÍA
+  const newDevice = await prisma.device.create({ 
+      data: {
+          ...data,
+          hotelId: hotelIdToAssign 
+      }
+  });
+
   await auditService.logActivity({
     action: 'CREATE',
     entity: 'Device',
@@ -108,24 +133,28 @@ export const createDevice = async (data, user) => {
 
 export const updateDevice = async (id, data, user) => {
   const deviceId = Number(id);
+  const tenantFilter = getTenantFilter(user);
+
+  // Verificamos que el dispositivo exista Y pertenezca al hotel del usuario
   const oldDevice = await prisma.device.findFirst({
-    where: { id: deviceId, deletedAt: null }
+    where: { 
+        id: deviceId, 
+        deletedAt: null,
+        ...tenantFilter // 🛡️ Seguridad
+    }
   });
 
-  if (!oldDevice) throw new Error("Dispositivo no encontrado");
+  if (!oldDevice) throw new Error("Dispositivo no encontrado o no tienes permiso para editarlo.");
 
-  // Lógica de cambio de estado (Baja/Reactivación)
   const disposedStatus = await prisma.deviceStatus.findFirst({ where: { nombre: DEVICE_STATUS.DISPOSED } });
   const disposedStatusId = disposedStatus?.id;
 
   if (disposedStatusId) {
-    // CASO 1: Reactivación
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
       data.fecha_baja = null;
       data.motivo_baja = null;
       data.observaciones_baja = null;
     }
-    // CASO 2: Baja Nueva
     else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
       data.fecha_baja = new Date();
     }
@@ -136,7 +165,6 @@ export const updateDevice = async (id, data, user) => {
     data,
   });
 
-  // 📝 REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'UPDATE',
     entity: 'Device',
@@ -152,14 +180,22 @@ export const updateDevice = async (id, data, user) => {
 
 export const deleteDevice = async (id, user) => {
   const deviceId = Number(id);
-  const oldDevice = await prisma.device.findFirst({ where: { id: deviceId } });
+  const tenantFilter = getTenantFilter(user);
+
+  const oldDevice = await prisma.device.findFirst({ 
+      where: { 
+          id: deviceId,
+          ...tenantFilter // 🛡️ Seguridad
+      } 
+  });
+
+  if (!oldDevice) throw new Error("Dispositivo no encontrado o sin permisos.");
 
   const deletedDevice = await prisma.device.update({
     where: { id: deviceId },
     data: { deletedAt: new Date() }
   });
 
-  // 📝 REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'DELETE',
     entity: 'Device',
@@ -172,11 +208,14 @@ export const deleteDevice = async (id, user) => {
   return deletedDevice;
 };
 
-export const getDeviceById = (id) =>
-  prisma.device.findFirst({
+export const getDeviceById = (id, user) => {
+  const tenantFilter = getTenantFilter(user);
+  
+  return prisma.device.findFirst({
     where: {
       id: Number(id),
-      deletedAt: null
+      deletedAt: null,
+      ...tenantFilter // 🛡️ Seguridad
     },
     include: {
       usuario: true,
@@ -186,12 +225,16 @@ export const getDeviceById = (id) =>
       area: { include: { departamento: true } },
     },
   });
+};
 
-export const getAllActiveDeviceNames = () =>
-  prisma.device.findMany({
+export const getAllActiveDeviceNames = (user) => {
+  const tenantFilter = getTenantFilter(user);
+
+  return prisma.device.findMany({
     where: {
       estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-      deletedAt: null
+      deletedAt: null,
+      ...tenantFilter // 🛡️ Seguridad
     },
     select: {
       id: true,
@@ -201,11 +244,15 @@ export const getAllActiveDeviceNames = () =>
     },
     orderBy: { etiqueta: 'asc' }
   });
+};
 
-export const getInactiveDevices = async ({ skip, take, search }) => {
+export const getInactiveDevices = async ({ skip, take, search }, user) => {
+  const tenantFilter = getTenantFilter(user);
+
   const whereClause = {
     estado: { nombre: DEVICE_STATUS.DISPOSED },
-    deletedAt: null
+    deletedAt: null,
+    ...tenantFilter // 🛡️ Seguridad
   };
 
   if (search) {
@@ -239,10 +286,13 @@ export const getInactiveDevices = async ({ skip, take, search }) => {
   return { devices, totalCount };
 };
 
-export const getPandaStatusCounts = async () => {
+export const getPandaStatusCounts = async (user) => {
+  const tenantFilter = getTenantFilter(user);
+
   const baseWhere = {
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-    deletedAt: null
+    deletedAt: null,
+    ...tenantFilter // 🛡️ Seguridad
   };
 
   const totalActiveDevices = await prisma.device.count({ where: baseWhere });
@@ -268,7 +318,9 @@ export const getPandaStatusCounts = async () => {
   };
 };
 
-export const getDashboardStats = async () => {
+export const getDashboardStats = async (user) => {
+  const tenantFilter = getTenantFilter(user);
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -283,7 +335,8 @@ export const getDashboardStats = async () => {
 
   const activeFilter = {
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-    deletedAt: null
+    deletedAt: null,
+    ...tenantFilter // 🛡️ Seguridad
   };
 
   const [
@@ -302,7 +355,8 @@ export const getDashboardStats = async () => {
       where: {
         estado: { nombre: DEVICE_STATUS.DISPOSED },
         fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() },
-        deletedAt: null
+        deletedAt: null,
+        ...tenantFilter // 🛡️ Seguridad
       }
     }),
     prisma.device.findMany({
@@ -420,6 +474,7 @@ const extractRowData = (row, headerMap) => {
   };
 };
 
+// Necesitamos el hotelId del usuario para filtrar las búsquedas en los mapas
 const resolveForeignKeys = (data, context) => {
   let usuarioId = null;
   if (data.responsableLogin) {
@@ -430,9 +485,11 @@ const resolveForeignKeys = (data, context) => {
   }
 
   let areaId = null;
+  // Intentamos match exacto con depto
   if (data.areaStr && data.deptoStr) {
     areaId = context.areaMap.get(`${cleanLower(data.areaStr)}|${cleanLower(data.deptoStr)}`);
   }
+  // Fallback solo nombre de area
   if (!areaId && data.areaStr) {
     const possibleArea = context.areasList.find(a => cleanLower(a.nombre) === cleanLower(data.areaStr));
     if (possibleArea) areaId = possibleArea.id;
@@ -449,13 +506,18 @@ export const importDevicesFromExcel = async (buffer, user) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
+  
+  const tenantFilter = getTenantFilter(user);
 
+  // 1. Cargamos datos CONTEXTUALES al hotel del usuario
   const [areas, users] = await Promise.all([
     prisma.area.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...tenantFilter }, // 🛡️ Solo áreas del hotel
       include: { departamento: true }
     }),
-    prisma.user.findMany({ where: { deletedAt: null } }),
+    prisma.user.findMany({ 
+        where: { deletedAt: null, ...tenantFilter } // 🛡️ Solo usuarios del hotel
+    }),
   ]);
 
   const context = {
@@ -517,9 +579,26 @@ export const importDevicesFromExcel = async (buffer, user) => {
     status: new Map(),
     os: new Map()
   };
+  
+  // Asignamos el hotelId del usuario que importa
+  let hotelIdToImport = user.hotelId;
+  if (!hotelIdToImport) {
+     // Si es root, debería venir en algún lado o fallar, para simplificar, 
+     // en importación masiva por root asumimos que no se soporta o se requiere un header especial.
+     // Por seguridad, si no hay hotelId en usuario, detenemos importación masiva de equipos 
+     // (a menos que quieras permitir importar a "null" o a un hotel default).
+     // Por ahora, lanzamos error si es Root puro sin seleccionar hotel contexto.
+     // Sin embargo, si es Root, el filtro getTenantFilter devuelve {}, asi que esto podría mezclar datos.
+     // Recomendación: Root debe loguearse como un usuario específico de hotel o pasar un header.
+     // Para MVP, asumimos que importación solo la hacen Admins Locales.
+  }
 
   for (const item of devicesToProcess) {
     try {
+      if (!hotelIdToImport) {
+         throw new Error("El usuario Root debe especificar un Hotel para importar (Funcionalidad pendiente). Usa un Admin Local.");
+      }
+
       const tipoId = await getOrCreateCatalog('deviceType', item.meta.tipo, caches.types);
       const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, caches.status);
       const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, caches.os);
@@ -528,10 +607,17 @@ export const importDevicesFromExcel = async (buffer, user) => {
         ...item.deviceData,
         tipoId,
         estadoId,
-        sistemaOperativoId
+        sistemaOperativoId,
+        hotelId: hotelIdToImport // 🛡️ Asignamos el hotel
       };
 
-      const exists = await prisma.device.findUnique({ where: { numero_serie: finalData.numero_serie } });
+      // Verificamos duplicados SOLO dentro del mismo hotel
+      const exists = await prisma.device.findFirst({ 
+          where: { 
+              numero_serie: finalData.numero_serie,
+              hotelId: hotelIdToImport 
+          } 
+      });
 
       if (!exists) {
         await prisma.device.create({ data: finalData });
@@ -557,7 +643,7 @@ export const importDevicesFromExcel = async (buffer, user) => {
       action: 'IMPORT',
       entity: 'Device',
       entityId: 0,
-      details: `Importación masiva: ${successCount} equipos procesados.`,
+      details: `Importación masiva: ${successCount} equipos procesados en Hotel ID: ${hotelIdToImport}.`,
       user: user
     });
   }
@@ -565,7 +651,9 @@ export const importDevicesFromExcel = async (buffer, user) => {
   return { successCount, errors };
 };
 
-export const getExpiredWarrantyAnalysis = async (startDate, endDate) => {
+export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
+  const tenantFilter = getTenantFilter(user);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -575,7 +663,8 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate) => {
       deletedAt: null,
       garantia_fin: {
         lt: today.toISOString()
-      }
+      },
+      ...tenantFilter // 🛡️ Seguridad
     },
     include: {
       tipo: { select: { nombre: true } },

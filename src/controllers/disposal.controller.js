@@ -9,7 +9,8 @@ export const getDisposals = async (req, res, next) => {
     const search = req.query.search || ""; 
     const skip = (page - 1) * limit;
 
-    const { devices, totalCount } = await deviceService.getInactiveDevices({ skip, take: limit, search });
+    // 👈 PASAMOS req.user al servicio de dispositivos
+    const { devices, totalCount } = await deviceService.getInactiveDevices({ skip, take: limit, search }, req.user);
     
     res.json({
       data: devices,
@@ -24,8 +25,9 @@ export const getDisposals = async (req, res, next) => {
 
 export const getDisposal = async (req, res, next) => {
   try {
-    const disposal = await deviceService.getDeviceById(req.params.id); 
-    if (!disposal) return res.status(404).json({ error: "Baja no encontrada" });
+    // 👈 PASAMOS req.user para filtrar
+    const disposal = await deviceService.getDeviceById(req.params.id, req.user); 
+    if (!disposal) return res.status(404).json({ error: "Baja no encontrada o sin permisos" });
     res.json(disposal);
   } catch (error) {
     next(error);
@@ -34,15 +36,16 @@ export const getDisposal = async (req, res, next) => {
 
 export const updateDisposal = async (req, res, next) => {
   try {
-    const oldDisposal = await deviceService.getDeviceById(req.params.id);
-    if (!oldDisposal) return res.status(404).json({ message: "Disposal not found" });
+    // Verificamos existencia y permiso primero
+    const oldDisposal = await deviceService.getDeviceById(req.params.id, req.user);
+    if (!oldDisposal) return res.status(404).json({ message: "Baja no encontrada o sin permisos" });
     
     const dataToUpdate = {
       motivo_baja: req.body.motivo_baja,
       observaciones_baja: req.body.observaciones_baja
     };
 
-    // 👈 PASAMOS req.user
+    // Actualizamos pasando req.user
     const disposal = await deviceService.updateDevice(req.params.id, dataToUpdate, req.user);
     res.json(disposal);
   } catch (error) {
@@ -52,7 +55,7 @@ export const updateDisposal = async (req, res, next) => {
 
 export const deleteDisposal = async (req, res, next) => {
   try {
-    res.status(403).json({ error: "Las bajas no se pueden eliminar, es un registro permanente." });
+    res.status(403).json({ error: "Las bajas no se pueden eliminar, es un registro histórico permanente." });
   } catch (error) {
     next(error);
   }
@@ -60,7 +63,8 @@ export const deleteDisposal = async (req, res, next) => {
 
 export const exportDisposalsExcel = async (req, res, next) => {
   try {
-    const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }); 
+    // 👈 PASAMOS req.user
+    const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }, req.user); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Bajas de Equipos");
     

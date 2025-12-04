@@ -31,13 +31,14 @@ export const getMaintenances = async (req, res, next) => {
       };
     }
     
+    // 👈 PASAMOS req.user para filtrar
     const { maintenances, totalCount } = await maintenanceService.getMaintenances({ 
       skip, 
       take: limit, 
       where: whereClause,
       sortBy, 
       order 
-    });
+    }, req.user);
 
     res.json({ data: maintenances, totalCount: totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
   } catch (error) { 
@@ -47,7 +48,7 @@ export const getMaintenances = async (req, res, next) => {
 
 export const getMaintenance = async (req, res, next) => {
   try {
-    const maintenance = await maintenanceService.getMaintenanceById(req.params.id);
+    const maintenance = await maintenanceService.getMaintenanceById(req.params.id, req.user);
     if (!maintenance) return res.status(404).json({ message: "Maintenance not found" });
     res.json(maintenance);
   } catch (error) {
@@ -67,8 +68,8 @@ export const createMaintenance = async (req, res, next) => {
 
 export const updateMaintenance = async (req, res, next) => {
   try {
-    const oldMaintenance = await maintenanceService.getMaintenanceById(req.params.id);
-    if (!oldMaintenance) return res.status(404).json({ message: "Maintenance not found" });
+    const oldMaintenance = await maintenanceService.getMaintenanceById(req.params.id, req.user);
+    if (!oldMaintenance) return res.status(404).json({ message: "Maintenance not found or access denied" });
 
     let dataToUpdate = { ...req.body };
 
@@ -79,7 +80,6 @@ export const updateMaintenance = async (req, res, next) => {
       dataToUpdate.fecha_realizacion = null;
     }
 
-    // 👈 PASAMOS req.user
     const updatedMaintenance = await maintenanceService.updateMaintenance(req.params.id, dataToUpdate, req.user);
     res.json(updatedMaintenance);
   } catch (error) {
@@ -89,14 +89,13 @@ export const updateMaintenance = async (req, res, next) => {
 
 export const deleteMaintenance = async (req, res, next) => {
   try {
-    const oldMaintenance = await maintenanceService.getMaintenanceById(req.params.id);
+    const oldMaintenance = await maintenanceService.getMaintenanceById(req.params.id, req.user);
     if (!oldMaintenance) return res.status(404).json({ message: "Maintenance not found" });
 
     if (oldMaintenance.estado === MAINTENANCE_STATUS.COMPLETED || oldMaintenance.estado === MAINTENANCE_STATUS.CANCELLED) {
       return res.status(403).json({ message: "No se puede eliminar un mantenimiento que ya forma parte del historial." });
     }
 
-    // 👈 PASAMOS req.user
     await maintenanceService.deleteMaintenance(req.params.id, req.user);
     res.json({ message: "Maintenance deleted" });
   } catch (error) {
@@ -110,7 +109,7 @@ export const exportMaintenances = async (req, res, next) => {
       skip: 0, 
       take: undefined, 
       where: {} 
-    });
+    }, req.user); // 👈 req.user para filtrar exportación
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Mantenimientos");
@@ -170,16 +169,16 @@ export const exportMaintenances = async (req, res, next) => {
 export const exportIndividualMaintenance = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const maintenance = await maintenanceService.getMaintenanceById(id);
+    // 👈 PASAMOS req.user
+    const maintenance = await maintenanceService.getMaintenanceById(id, req.user);
 
-    if (!maintenance) return res.status(404).json({ error: "Mantenimiento no encontrado" });
+    if (!maintenance) return res.status(404).json({ error: "Mantenimiento no encontrado o sin permisos" });
     if (!maintenance.device) return res.status(404).json({ error: "No se encontró el dispositivo asociado a este mantenimiento." });
     const device = maintenance.device;
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Formato de Servicio");
 
-    // (Lógica de exportación individual se mantiene igual...)
     worksheet.mergeCells('A1:D1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `Formato de Servicio - Manto #${maintenance.id}`;

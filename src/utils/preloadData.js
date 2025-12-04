@@ -17,6 +17,11 @@ const HOTELS_LIST = [
         codigo: "CPC-SEN", 
         direccion: "Blvd. Kukulcan Km 18.5, Zona Hotelera, Cancún" 
     },
+    { 
+        nombre: "Corporativo",  // 👈 Tu entidad Corporativa
+        codigo: "CORP-HQ", 
+        direccion: "Oficinas Centrales" 
+    },
     // Puedes agregar Vallarta u otros aquí en el futuro
     // { nombre: "Crown Paradise Club Puerto Vallarta", codigo: "CPC-PVR", ... }
 ];

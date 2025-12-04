@@ -8,12 +8,13 @@ export const getDepartments = async (req, res, next) => {
     const order = req.query.order || "asc";
     const skip = (page - 1) * limit;
 
+    // Si limit es 0, devolvemos todo (pero filtrado por el hotel del usuario)
     if (isNaN(limit) || limit === 0 || req.query.limit === undefined || req.query.limit === '0') {
-        const departments = await departmentService.getAllDepartments(); 
+        const departments = await departmentService.getAllDepartments(req.user); // 👈 req.user
         return res.json(departments);
     }
     
-    const { departments, totalCount } = await departmentService.getDepartments({ skip, take: limit, sortBy, order });
+    const { departments, totalCount } = await departmentService.getDepartments({ skip, take: limit, sortBy, order }, req.user); // 👈 req.user
 
     res.json({ data: departments, totalCount: totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
   } catch (error) { 
@@ -23,7 +24,7 @@ export const getDepartments = async (req, res, next) => {
 
 export const getDepartment = async (req, res, next) => {
   try {
-    const department = await departmentService.getDepartmentById(req.params.id);
+    const department = await departmentService.getDepartmentById(req.params.id, req.user);
     if (!department) return res.status(404).json({ message: "Department not found" });
     res.json(department);
   } catch (error) {
@@ -33,7 +34,8 @@ export const getDepartment = async (req, res, next) => {
 
 export const createDepartment = async (req, res, next) => {
   try {
-    const department = await departmentService.createDepartment(req.body, req.user); // 👈 req.user
+    // El servicio tomará el hotelId del usuario automáticamente
+    const department = await departmentService.createDepartment(req.body, req.user);
     res.status(201).json(department);
   } catch (error) {
     next(error);
@@ -42,9 +44,7 @@ export const createDepartment = async (req, res, next) => {
 
 export const updateDepartment = async (req, res, next) => {
   try {
-    const oldDept = await departmentService.getDepartmentById(req.params.id);
-    if (!oldDept) return res.status(404).json({ message: "Department not found" });
-    const department = await departmentService.updateDepartment(req.params.id, req.body, req.user); // 👈 req.user
+    const department = await departmentService.updateDepartment(req.params.id, req.body, req.user);
     res.json(department);
   } catch (error) {
     next(error);
@@ -53,9 +53,7 @@ export const updateDepartment = async (req, res, next) => {
 
 export const deleteDepartment = async (req, res, next) => {
   try {
-    const oldDept = await departmentService.getDepartmentById(req.params.id);
-    if (!oldDept) return res.status(404).json({ message: "Department not found" });
-    await departmentService.deleteDepartment(req.params.id, req.user); // 👈 req.user
+    await departmentService.deleteDepartment(req.params.id, req.user);
     res.json({ message: "Department deleted" });
   } catch (error) {
     next(error);
