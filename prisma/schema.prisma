@@ -38,7 +38,7 @@ model Hotel {
 // ==========================================
 
 enum Rol {
-  SUPER_ADMIN   // Root / Dev (Global)
+  ROOT   // Root / Dev (Global)
   CORP_VIEWER   // Auditoría Global (Solo lectura)
   HOTEL_ADMIN   // Jefe de Sistemas (Local)
   HOTEL_AUX     // Auxiliar / Editor (Operativo)
