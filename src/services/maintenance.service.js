@@ -1,11 +1,20 @@
 // src/services/maintenance.service.js
 import prisma from "../../src/PrismaClient.js";
-import * as auditService from "./audit.service.js"; // 👈 IMPORTAR
+import * as auditService from "./audit.service.js"; 
 
-export const getMaintenances = async ({ skip, take, where, sortBy, order }) => {
+// Helper de seguridad multi-tenant
+const getTenantFilter = (user) => {
+  if (!user || !user.hotelId) return {}; 
+  return { hotelId: user.hotelId };
+};
+
+export const getMaintenances = async ({ skip, take, where, sortBy, order }, user) => {
+  const tenantFilter = getTenantFilter(user);
+  
   const finalWhere = {
     ...where,
-    deletedAt: null
+    deletedAt: null,
+    ...tenantFilter // 🛡️ Solo mantenimientos de mi hotel
   };
 
   let orderBy = { fecha_programada: 'desc' };
@@ -41,11 +50,14 @@ export const getMaintenances = async ({ skip, take, where, sortBy, order }) => {
   return { maintenances, totalCount };
 };
 
-export const getMaintenanceById = (id) =>
-  prisma.maintenance.findFirst({
+export const getMaintenanceById = (id, user) => {
+  const tenantFilter = getTenantFilter(user);
+  
+  return prisma.maintenance.findFirst({
     where: {
       id: Number(id),
-      deletedAt: null
+      deletedAt: null,
+      ...tenantFilter
     },
     include: {
       device: {
@@ -61,11 +73,28 @@ export const getMaintenanceById = (id) =>
       },
     },
   });
+};
 
 export const createMaintenance = async (data, user) => {
-  const newManto = await prisma.maintenance.create({ data });
+  // 1. Buscamos el dispositivo para ver su hotel
+  const device = await prisma.device.findUnique({ where: { id: Number(data.deviceId) } });
+  if (!device) throw new Error("Dispositivo no encontrado.");
 
-  // 📝 REGISTRAR
+  // 2. Seguridad: Si el usuario tiene hotelId, debe coincidir con el del dispositivo
+  // Esto evita que un admin de Cancún programe manto a un equipo de Sensira sabiendo su ID.
+  if (user.hotelId && device.hotelId !== user.hotelId) {
+      throw new Error("No puedes programar mantenimiento para un equipo que no pertenece a tu hotel.");
+  }
+
+  // 3. Crear el mantenimiento HEREDANDO el hotelId del dispositivo
+  const newManto = await prisma.maintenance.create({ 
+      data: {
+          ...data,
+          hotelId: device.hotelId // 🛡️ HERENCIA: El mantenimiento pertenece al mismo hotel que el equipo
+      } 
+  });
+
+  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'CREATE',
     entity: 'Maintenance',
@@ -80,7 +109,11 @@ export const createMaintenance = async (data, user) => {
 
 export const updateMaintenance = async (id, data, user) => {
   const mantoId = Number(id);
-  const oldManto = await prisma.maintenance.findFirst({ where: { id: mantoId } });
+  const tenantFilter = getTenantFilter(user);
+  
+  // Verificamos existencia y permiso
+  const oldManto = await prisma.maintenance.findFirst({ where: { id: mantoId, ...tenantFilter } });
+  if (!oldManto) throw new Error("Mantenimiento no encontrado o sin permisos.");
 
   const updatedManto = await prisma.maintenance.update({
     where: { id: mantoId },
@@ -92,7 +125,7 @@ export const updateMaintenance = async (id, data, user) => {
     details = "Mantenimiento COMPLETADO";
   }
 
-  // 📝 REGISTRAR
+  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'UPDATE',
     entity: 'Maintenance',
@@ -108,14 +141,17 @@ export const updateMaintenance = async (id, data, user) => {
 
 export const deleteMaintenance = async (id, user) => {
   const mantoId = Number(id);
-  const oldManto = await prisma.maintenance.findFirst({ where: { id: mantoId } });
+  const tenantFilter = getTenantFilter(user);
+
+  const oldManto = await prisma.maintenance.findFirst({ where: { id: mantoId, ...tenantFilter } });
+  if (!oldManto) throw new Error("Mantenimiento no encontrado o sin permisos.");
 
   const deleted = await prisma.maintenance.update({
     where: { id: mantoId },
     data: { deletedAt: new Date() }
   });
 
-  // 📝 REGISTRAR
+  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'DELETE',
     entity: 'Maintenance',

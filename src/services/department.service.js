@@ -1,10 +1,20 @@
-// src/services/department.service.js
 import prisma from "../../src/PrismaClient.js";
-import * as auditService from "./audit.service.js"; // 👈 IMPORTAR
+import * as auditService from "./audit.service.js"; 
 
-export const getDepartments = async ({ skip, take, sortBy, order }) => {
+// 🛡️ Helper para aislar datos por hotel
+const getTenantFilter = (user) => {
+  if (!user || !user.hotelId) return {}; // Root ve todo
+  return { hotelId: user.hotelId }; // Admin local solo ve lo suyo
+};
+
+export const getDepartments = async ({ skip, take, sortBy, order }, user) => {
   const orderBy = sortBy ? { [sortBy]: order } : { nombre: 'asc' };
-  const whereClause = { deletedAt: null };
+  const tenantFilter = getTenantFilter(user);
+
+  const whereClause = { 
+      deletedAt: null,
+      ...tenantFilter // 🛡️ Filtro activo
+  };
 
   const [departments, totalCount] = await prisma.$transaction([
     prisma.department.findMany({
@@ -18,19 +28,41 @@ export const getDepartments = async ({ skip, take, sortBy, order }) => {
   return { departments, totalCount };
 };
 
-export const getAllDepartments = () => prisma.department.findMany({
-    where: { deletedAt: null },
-    orderBy: { nombre: 'asc' }
-});
+export const getAllDepartments = (user) => {
+    const tenantFilter = getTenantFilter(user);
+    return prisma.department.findMany({
+        where: { deletedAt: null, ...tenantFilter },
+        orderBy: { nombre: 'asc' }
+    });
+};
 
-export const getDepartmentById = (id) => prisma.department.findFirst({
-  where: { id: Number(id), deletedAt: null },
-});
+export const getDepartmentById = (id, user) => {
+  const tenantFilter = getTenantFilter(user);
+  return prisma.department.findFirst({
+    where: { 
+        id: Number(id), 
+        deletedAt: null, 
+        ...tenantFilter // Solo si pertenece a mi hotel
+    },
+  });
+};
 
-export const createDepartment = async (data, user) => { // 👈 Recibe 'user'
-  const newDept = await prisma.department.create({ data });
+export const createDepartment = async (data, user) => {
+  // 🛡️ ASIGNACIÓN AUTOMÁTICA DE UBICACIÓN
+  let hotelIdToAssign = user.hotelId;
+  
+  // Si es Root, permitimos que elija el hotel, si no, es obligatorio su propio hotel
+  if (!hotelIdToAssign && data.hotelId) hotelIdToAssign = Number(data.hotelId);
+  
+  if (!hotelIdToAssign) throw new Error("No se puede crear un departamento sin asignar un Hotel.");
 
-  // 📝 AUDITORÍA
+  const newDept = await prisma.department.create({ 
+      data: {
+          nombre: data.nombre,
+          hotelId: hotelIdToAssign // 👈 Aquí se fija la ubicación
+      }
+  });
+
   await auditService.logActivity({
       action: 'CREATE',
       entity: 'Department',
@@ -43,16 +75,22 @@ export const createDepartment = async (data, user) => { // 👈 Recibe 'user'
   return newDept;
 };
 
-export const updateDepartment = async (id, data, user) => { // 👈 Recibe 'user'
+export const updateDepartment = async (id, data, user) => {
   const deptId = Number(id);
-  const oldDept = await prisma.department.findFirst({ where: { id: deptId } });
+  const tenantFilter = getTenantFilter(user);
+
+  // Verificamos propiedad antes de editar
+  const oldDept = await prisma.department.findFirst({ 
+      where: { id: deptId, ...tenantFilter } 
+  });
+  
+  if (!oldDept) throw new Error("Departamento no encontrado o sin permisos.");
 
   const updatedDept = await prisma.department.update({
     where: { id: deptId },
-    data,
+    data: { nombre: data.nombre }, // Solo permitimos cambiar nombre, no hotel
   });
 
-  // 📝 AUDITORÍA
   await auditService.logActivity({
       action: 'UPDATE',
       entity: 'Department',
@@ -66,16 +104,18 @@ export const updateDepartment = async (id, data, user) => { // 👈 Recibe 'user
   return updatedDept;
 };
 
-export const deleteDepartment = async (id, user) => { // 👈 Recibe 'user'
+export const deleteDepartment = async (id, user) => {
   const deptId = Number(id);
-  const oldDept = await prisma.department.findFirst({ where: { id: deptId } });
+  const tenantFilter = getTenantFilter(user);
+
+  const oldDept = await prisma.department.findFirst({ where: { id: deptId, ...tenantFilter } });
+  if (!oldDept) throw new Error("Departamento no encontrado o sin permisos.");
 
   const deleted = await prisma.department.update({
     where: { id: deptId },
     data: { deletedAt: new Date() }
   });
 
-  // 📝 AUDITORÍA
   await auditService.logActivity({
       action: 'DELETE',
       entity: 'Department',

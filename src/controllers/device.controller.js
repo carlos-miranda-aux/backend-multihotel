@@ -15,6 +15,7 @@ export const getDevices = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
+    // 👈 PASAMOS req.user al servicio
     const { devices, totalCount } = await deviceService.getActiveDevices({ 
         skip, 
         take: limit, 
@@ -22,7 +23,7 @@ export const getDevices = async (req, res, next) => {
         filter,
         sortBy,
         order
-    });
+    }, req.user);
     
     res.json({
       data: devices,
@@ -38,7 +39,8 @@ export const getDevices = async (req, res, next) => {
 
 export const getAllActiveDeviceNames = async (req, res, next) => {
     try {
-      const devices = await deviceService.getAllActiveDeviceNames();
+      // 👈 PASAMOS req.user
+      const devices = await deviceService.getAllActiveDeviceNames(req.user);
       res.json(devices); 
     } catch (error) {
       next(error);
@@ -47,8 +49,9 @@ export const getAllActiveDeviceNames = async (req, res, next) => {
   
 export const getDevice = async (req, res, next) => {
     try {
-        const device = await deviceService.getDeviceById(req.params.id);
-        if (!device) return res.status(404).json({ error: "Dispositivo no encontrado" });
+        // 👈 PASAMOS req.user
+        const device = await deviceService.getDeviceById(req.params.id, req.user);
+        if (!device) return res.status(404).json({ error: "Dispositivo no encontrado o no tienes acceso a este hotel." });
         res.json(device);
     } catch (error) {
         next(error);
@@ -57,7 +60,8 @@ export const getDevice = async (req, res, next) => {
 
 export const getPandaStatus = async (req, res, next) => {
     try {
-        const counts = await deviceService.getPandaStatusCounts();
+        // 👈 PASAMOS req.user
+        const counts = await deviceService.getPandaStatusCounts(req.user);
         res.json(counts);
     } catch (error) {
         next(error);
@@ -66,7 +70,8 @@ export const getPandaStatus = async (req, res, next) => {
 
 export const getDashboardData = async (req, res, next) => {
     try {
-        const stats = await deviceService.getDashboardStats();
+        // 👈 PASAMOS req.user
+        const stats = await deviceService.getDashboardStats(req.user);
         res.json(stats);
     } catch (error) {
         next(error);
@@ -96,16 +101,18 @@ export const createDevice = async (req, res, next) => {
         observaciones_baja: null 
       };
 
-      // 👈 PASAMOS req.user
+      // PASAMOS req.user (El servicio inyectará el hotelId)
       const newDevice = await deviceService.createDevice(dataToCreate, req.user);
       
       if (fecha_proxima_revision) {
+        // Crear mantenimiento inicial vinculado al mismo hotel del equipo
         await prisma.maintenance.create({
           data: {
             descripcion: "Revisión preventiva inicial",
             fecha_programada: new Date(fecha_proxima_revision),
             estado: "pendiente",
             deviceId: newDevice.id,
+            hotelId: newDevice.hotelId, // 👈 Importante: Vincular mantenimiento al hotel
             diagnostico: "Programado", 
             acciones_realizadas: "Pendiente de revisión",
             observaciones: ""
@@ -139,7 +146,6 @@ export const updateDevice = async (req, res, next) => {
       if (dataToUpdate.garantia_numero_reporte === "") dataToUpdate.garantia_numero_reporte = null;
       if (dataToUpdate.garantia_notes === "") dataToUpdate.garantia_notes = null;
       
-      // 👈 PASAMOS req.user
       const updatedDevice = await deviceService.updateDevice(deviceId, dataToUpdate, req.user);
       res.json(updatedDevice);
 
@@ -150,10 +156,7 @@ export const updateDevice = async (req, res, next) => {
 
 export const deleteDevice = async (req, res, next) => {
     try {
-      const oldDevice = await deviceService.getDeviceById(req.params.id);
-      if (!oldDevice) return res.status(404).json({ error: "Dispositivo no encontrado" });
-  
-      // 👈 PASAMOS req.user
+      // El servicio ahora valida si el usuario tiene permiso sobre este dispositivo
       await deviceService.deleteDevice(req.params.id, req.user);
       
       res.json({ message: "Dispositivo eliminado" });
@@ -164,10 +167,12 @@ export const deleteDevice = async (req, res, next) => {
 
 export const exportInactiveDevices = async (req, res, next) => {
     try {
-      const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }); 
+      // PASAMOS req.user
+      const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }, req.user); 
+      
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Dispositivos Inactivos");
-      
+      // ... (Configuración de columnas igual que antes) ...
       worksheet.columns = [
         { header: "N°", key: "numero", width: 10 },
         { header: "Etiqueta", key: "etiqueta", width: 15 },
@@ -217,11 +222,13 @@ export const exportInactiveDevices = async (req, res, next) => {
 
 export const exportAllDevices = async (req, res, next) => {
     try {
-      const { devices } = await deviceService.getActiveDevices({ skip: 0, take: undefined });
+      // PASAMOS req.user
+      const { devices } = await deviceService.getActiveDevices({ skip: 0, take: undefined }, req.user);
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Inventario Activo");
       
-      worksheet.columns = [
+      // ... (Configuración de columnas igual que antes) ...
+       worksheet.columns = [
         { header: "Etiqueta", key: "etiqueta", width: 20 },
         { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },
         { header: "Tipo", key: "tipo", width: 20 },
@@ -274,6 +281,7 @@ export const exportAllDevices = async (req, res, next) => {
           es_panda: device.es_panda ? "Sí" : "No",
         });
       });
+
       worksheet.getRow(1).font = { bold: true };
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", "attachment; filename=inventario_activo.xlsx");
@@ -290,7 +298,6 @@ export const importDevices = async (req, res, next) => {
         return res.status(400).json({ error: "No se ha subido ningún archivo." });
       }
       
-      // La importación masiva podría también recibir req.user si quieres auditar la importación
       const { successCount, errors } = await deviceService.importDevicesFromExcel(req.file.buffer, req.user);
       
       res.json({ 
@@ -306,7 +313,10 @@ export const importDevices = async (req, res, next) => {
 export const exportCorrectiveAnalysis = async (req, res, next) => {
     try {
         const { startDate, endDate } = req.query; 
-        const analysisData = await deviceService.getExpiredWarrantyAnalysis(startDate, endDate);
+        // PASAMOS req.user
+        const analysisData = await deviceService.getExpiredWarrantyAnalysis(startDate, endDate, req.user);
+        
+        // ... (Exportación Excel igual que antes) ...
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("Analisis Garantia-Correctivos"); 
         

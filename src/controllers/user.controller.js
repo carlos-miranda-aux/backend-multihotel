@@ -13,17 +13,18 @@ export const getUsers = async (req, res, next) => {
     
     const skip = (page - 1) * limit;
 
+    // Si limit es 0, devolvemos todo (pero filtrado por el hotel del usuario)
     if (limit === 0) {
         const { users } = await userService.getUsers({ 
             skip: 0, 
             take: undefined, 
             sortBy, 
             order 
-        });
+        }, req.user);
         return res.json(users);
     }
 
-    const { users, totalCount } = await userService.getUsers({ skip, take: limit, search: req.query.search, sortBy, order });
+    const { users, totalCount } = await userService.getUsers({ skip, take: limit, search: req.query.search, sortBy, order }, req.user);
 
     res.json({
       data: users,
@@ -38,7 +39,7 @@ export const getUsers = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    const users = await userService.getAllUsers();
+    const users = await userService.getAllUsers(req.user); 
     res.json(users); 
   } catch (error) {
     next(error);
@@ -47,8 +48,8 @@ export const getAllUsers = async (req, res, next) => {
 
 export const getUser = async (req, res, next) => {
   try {
-    const user = await userService.getUserById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await userService.getUserById(req.params.id, req.user);
+    if (!user) return res.status(404).json({ message: "User not found or access denied" });
     res.json(user);
   } catch (error) {
     next(error);
@@ -57,7 +58,7 @@ export const getUser = async (req, res, next) => {
 
 export const createUser = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
+    // El servicio asignará el hotel automáticamente basado en req.user
     const user = await userService.createUser(req.body, req.user);
     res.status(201).json(user);
   } catch (error) {
@@ -67,7 +68,6 @@ export const createUser = async (req, res, next) => {
 
 export const updateUser = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
     const user = await userService.updateUser(req.params.id, req.body, req.user);
     res.json(user);
   } catch (error) {
@@ -77,7 +77,6 @@ export const updateUser = async (req, res, next) => {
 
 export const deleteUser = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
     await userService.deleteUser(req.params.id, req.user);
     res.json({ message: "User deleted" });
   } catch (error) {
@@ -87,10 +86,11 @@ export const deleteUser = async (req, res, next) => {
 
 export const exportUsers = async (req, res, next) => {
   try {
-    const { users } = await userService.getUsers({ skip: 0, take: undefined }); 
+    // Usamos el servicio con el filtro de usuario para obtener solo sus empleados
+    const { users } = await userService.getUsers({ skip: 0, take: undefined }, req.user); 
     
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Usuarios Crown");
+    const worksheet = workbook.addWorksheet("Usuarios Staff");
     
     worksheet.columns = [
       { header: "ID", key: "id", width: 10 },
@@ -114,7 +114,7 @@ export const exportUsers = async (req, res, next) => {
 
     worksheet.getRow(1).font = { bold: true };
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=usuarios_crown.xlsx");
+    res.setHeader("Content-Disposition", "attachment; filename=usuarios_staff.xlsx");
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
