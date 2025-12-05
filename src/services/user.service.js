@@ -15,10 +15,7 @@ const getTenantFilter = (user) => {
 export const getUsers = async ({ skip, take, search, sortBy, order }, user) => {
   const tenantFilter = getTenantFilter(user);
   
-  const whereClause = {
-    deletedAt: null, 
-    ...tenantFilter 
-  };
+  const whereClause = { deletedAt: null, ...tenantFilter };
 
   if (search) {
     whereClause.OR = [
@@ -31,8 +28,8 @@ export const getUsers = async ({ skip, take, search, sortBy, order }, user) => {
   let orderBy = { nombre: 'asc' };
   if (sortBy) {
     if (sortBy.includes('.')) {
-      const [relation, field] = sortBy.split('.');
-      orderBy = { [relation]: { [field]: order } };
+      const parts = sortBy.split('.');
+      if (parts.length === 2) orderBy = { [parts[0]]: { [parts[1]]: order } };
     } else {
       orderBy = { [sortBy]: order };
     }
@@ -42,7 +39,9 @@ export const getUsers = async ({ skip, take, search, sortBy, order }, user) => {
     prisma.user.findMany({
       where: whereClause,
       include: {
-        area: { include: { departamento: true } }
+        area: { include: { departamento: true } },
+        // 👇 INCLUIMOS HOTEL
+        hotel: { select: { nombre: true, codigo: true } }
       },
       skip: skip,
       take: take,

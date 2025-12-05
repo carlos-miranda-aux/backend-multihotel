@@ -3,22 +3,32 @@ import * as auditService from "./audit.service.js";
 
 // 🛡️ Helper para aislar datos por hotel
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; // Root ve todo
-  return { hotelId: user.hotelId }; // Admin local solo ve lo suyo
+  if (!user || !user.hotelId) return {}; 
+  return { hotelId: user.hotelId }; 
 };
 
 export const getDepartments = async ({ skip, take, sortBy, order }, user) => {
-  const orderBy = sortBy ? { [sortBy]: order } : { nombre: 'asc' };
-  const tenantFilter = getTenantFilter(user);
+  // Soporte para ordenar por nombre de hotel
+  let orderBy = { nombre: 'asc' };
+  if (sortBy) {
+      if (sortBy.includes('.')) {
+          const parts = sortBy.split('.');
+          if (parts.length === 2) orderBy = { [parts[0]]: { [parts[1]]: order } };
+      } else {
+          orderBy = { [sortBy]: order };
+      }
+  }
 
-  const whereClause = { 
-      deletedAt: null,
-      ...tenantFilter // 🛡️ Filtro activo
-  };
+  const tenantFilter = getTenantFilter(user);
+  const whereClause = { deletedAt: null, ...tenantFilter };
 
   const [departments, totalCount] = await prisma.$transaction([
     prisma.department.findMany({
       where: whereClause,
+      include: { 
+          // 👇 INCLUIMOS DATOS DEL HOTEL
+          hotel: { select: { nombre: true, codigo: true } } 
+      },
       skip: skip,
       take: take,
       orderBy: orderBy

@@ -12,8 +12,11 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   
   if (sortBy) {
       if (sortBy.includes('.')) {
-          const [relation, field] = sortBy.split('.');
-          orderBy = { [relation]: { [field]: order } };
+          // Manejo de relaciones anidadas
+          const parts = sortBy.split('.');
+          if (parts.length === 2) {
+             orderBy = { [parts[0]]: { [parts[1]]: order } };
+          }
       } else {
           orderBy = { [sortBy]: order };
       }
@@ -27,7 +30,10 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   const [areas, totalCount] = await prisma.$transaction([
     prisma.area.findMany({
       where: whereClause,
-      include: { departamento: true },
+      include: { 
+          departamento: true,
+          hotel: { select: { nombre: true, id: true } } // Incluimos hotel para mostrar nombre
+      },
       skip: skip,
       take: take,
       orderBy: orderBy
@@ -38,6 +44,7 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   return { areas, totalCount };
 };
 
+// ... (Resto del archivo igual: createArea, updateArea, deleteArea, etc.)
 export const getAllAreas = (user) => {
   const tenantFilter = getTenantFilter(user);
   return prisma.area.findMany({
@@ -56,12 +63,10 @@ export const getAreaById = (id, user) => {
 };
 
 export const createArea = async (data, user) => {
-    // 🛡️ ASIGNACIÓN AUTOMÁTICA
     let hotelIdToAssign = user.hotelId;
     if (!hotelIdToAssign && data.hotelId) hotelIdToAssign = Number(data.hotelId);
     if (!hotelIdToAssign) throw new Error("Se requiere un Hotel para crear el área.");
 
-    // Validar que el departamento pertenezca al mismo hotel
     const dept = await prisma.department.findFirst({ 
         where: { id: Number(data.departamentoId), hotelId: hotelIdToAssign }
     });
@@ -94,7 +99,6 @@ export const updateArea = async (id, data, user) => {
     const oldArea = await prisma.area.findFirst({ where: { id: areaId, ...tenantFilter } });
     if (!oldArea) throw new Error("Área no encontrada o sin permisos.");
 
-    // Si cambia de departamento, validar que el nuevo depto sea del mismo hotel
     if (data.departamentoId) {
         const dept = await prisma.department.findFirst({ 
             where: { id: Number(data.departamentoId), hotelId: oldArea.hotelId }

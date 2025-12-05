@@ -14,7 +14,7 @@ export const getMaintenances = async ({ skip, take, where, sortBy, order }, user
   const finalWhere = {
     ...where,
     deletedAt: null,
-    ...tenantFilter // 🛡️ Solo mantenimientos de mi hotel
+    ...tenantFilter
   };
 
   let orderBy = { fecha_programada: 'desc' };
@@ -22,7 +22,6 @@ export const getMaintenances = async ({ skip, take, where, sortBy, order }, user
     if (sortBy.includes('.')) {
       const parts = sortBy.split('.');
       if (parts.length === 2) orderBy = { [parts[0]]: { [parts[1]]: order } };
-      if (parts.length === 3) orderBy = { [parts[0]]: { [parts[1]]: { [parts[2]]: order } } };
     } else {
       orderBy = { [sortBy]: order };
     }
@@ -38,7 +37,9 @@ export const getMaintenances = async ({ skip, take, where, sortBy, order }, user
             usuario: { select: { nombre: true, usuario_login: true } },
             area: { select: { nombre: true, departamento: { select: { nombre: true } } } }
           }
-        }
+        },
+        // 👇 INCLUIMOS HOTEL
+        hotel: { select: { nombre: true, codigo: true } }
       },
       skip: skip,
       take: take,
