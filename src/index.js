@@ -21,6 +21,7 @@ import maintenanceRoutes from "./routes/maintenance.routes.js";
 import disposalRoutes from "./routes/disposal.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import auditRoutes from "./routes/audit.routes.js"; 
+import hotelRoutes from "./routes/hotel.routes.js";
 
 import { errorHandler } from "./middlewares/errorHandler.js";
 
@@ -42,6 +43,7 @@ app.use("/api/maintenances", maintenanceRoutes);
 app.use("/api/disposals", disposalRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/audit", auditRoutes);
+app.use("/api/hotels", hotelRoutes);
 
 app.use(errorHandler);
 
