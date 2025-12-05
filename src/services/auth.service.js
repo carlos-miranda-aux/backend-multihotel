@@ -7,26 +7,14 @@ import * as auditService from "./audit.service.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecreto";
 
-// Helper de seguridad (Filtro por tenant para LISTAR usuarios)
-const getTenantFilter = (user) => {
-  if (!user || !user.hotels || user.hotels.length === 0) return {}; // Root/Global ve todo
-  // Si tiene hoteles asignados, filtramos los usuarios que pertenezcan a ALGUNO de esos hoteles
-  const userHotelIds = user.hotels.map(h => h.id);
-  return { hotels: { some: { id: { in: userHotelIds } } } };
-};
-
 export const registerUser = async (data, adminUser) => {
   const hashedPassword = await bcrypt.hash(data.password, 10);
   
-  // 🛡️ Lógica para vincular Hoteles
-  // Esperamos que data.hotelIds sea un array, ej: [1, 2]
+  // Lógica para vincular Hoteles (Conexión Muchos a Muchos)
   let hotelsToConnect = [];
-
   if (data.hotelIds && Array.isArray(data.hotelIds) && data.hotelIds.length > 0) {
       hotelsToConnect = data.hotelIds.map(id => ({ id: Number(id) }));
   } 
-  // Si no envía hoteles y no es ROOT, podríamos asignar el hotel del admin (si tuviera solo uno)
-  // Pero para simplicidad, asumimos que el frontend envía los IDs.
 
   const newUser = await prisma.userSistema.create({
     data: {
@@ -35,12 +23,11 @@ export const registerUser = async (data, adminUser) => {
       nombre: data.nombre,
       rol: data.rol || ROLES.HOTEL_GUEST,
       email: data.email,
-      // 🔥 CONEXIÓN MUCHOS A MUCHOS
       hotels: {
           connect: hotelsToConnect
       }
     },
-    include: { hotels: true } // Para devolverlo con sus hoteles
+    include: { hotels: true } 
   });
 
   await auditService.logActivity({
@@ -64,7 +51,6 @@ export const loginUser = async ({ identifier, password }) => {
       ],
       deletedAt: null 
     },
-    // 🔥 INCLUIMOS LA LISTA DE HOTELES
     include: { hotels: true } 
   });
   
@@ -72,13 +58,25 @@ export const loginUser = async ({ identifier, password }) => {
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword) throw new Error("Contraseña incorrecta");
   
-  // Token payload: Incluimos el array de hoteles
+  // Extraemos IDs para el token (Seguridad rápida en Middleware)
+  const allowedHotelIds = user.hotels.map(h => h.id);
+
+  // Registro de Auditoría de Login
+  await auditService.logActivity({
+      action: 'LOGIN',
+      entity: 'Auth',
+      entityId: user.id,
+      user: user, 
+      details: `Inicio de sesión exitoso. Rol: ${user.rol}`
+  });
+
   const token = jwt.sign(
     { 
       id: user.id, 
       username: user.username, 
       rol: user.rol, 
-      hotels: user.hotels // Array completo [{id:1, nombre:...}, ...]
+      hotels: user.hotels, // Info visual (nombres, ids)
+      allowedHotels: allowedHotelIds // Lista de IDs permitidos
     },
     JWT_SECRET,
     { expiresIn: "60d" }
@@ -98,21 +96,25 @@ export const loginUser = async ({ identifier, password }) => {
 };
 
 export const getUsers = async ({ skip, take, sortBy, order }, adminUser) => {
-  // Ajuste temporal: Root ve todo. Admin local ve usuarios en sus mismos hoteles.
   const whereClause = { deletedAt: null }; 
   
-  // Si no es ROOT, filtramos (lógica simplificada para este ejemplo)
-  if (adminUser.rol !== ROLES.ROOT && adminUser.hotels && adminUser.hotels.length > 0) {
+  // 🛡️ LÓGICA DE FILTRADO MULTI-TENANT
+  // 1. Si hay un contexto de hotel activo (seleccionado en el frontend), filtramos por ese hotel.
+  if (adminUser.hotelId) {
+      whereClause.hotels = { some: { id: adminUser.hotelId } };
+  } 
+  // 2. Si es usuario regional (sin contexto específico), ve todos sus hoteles asignados.
+  else if (adminUser.rol !== ROLES.ROOT && adminUser.hotels && adminUser.hotels.length > 0) {
       const myHotelIds = adminUser.hotels.map(h => h.id);
       whereClause.hotels = { some: { id: { in: myHotelIds } } };
   }
+  // 3. Si es ROOT sin contexto, ve todo (whereClause se queda limpio).
 
   const orderBy = sortBy ? { [sortBy]: order } : { nombre: 'asc' };
 
   const [users, totalCount] = await prisma.$transaction([
     prisma.userSistema.findMany({
       where: whereClause,
-      // Incluimos hoteles para mostrarlos en la tabla
       include: { hotels: true },
       skip: skip,
       take: take,
@@ -130,7 +132,7 @@ export const getUserById = (id, adminUser) => {
       id: Number(id),
       deletedAt: null,
     },
-    include: { hotels: true }, // Importante para la edición
+    include: { hotels: true }, // Importante para la edición (ver qué hoteles tiene)
   });
 };
 
@@ -173,7 +175,7 @@ export const updateUser = async (id, data, adminUser) => {
   if (rol) updateData.rol = rol;
   if (password) updateData.password = await bcrypt.hash(password, 10);
 
-  // 🔥 ACTUALIZAR HOTELES (Reemplazo completo)
+  // Actualizar Hoteles (Reemplazo completo de la relación)
   if (hotelIds && Array.isArray(hotelIds)) {
       updateData.hotels = {
           set: hotelIds.map(id => ({ id: Number(id) }))
