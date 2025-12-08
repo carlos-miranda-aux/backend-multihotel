@@ -1,8 +1,6 @@
-// src/services/maintenance.service.js
 import prisma from "../../src/PrismaClient.js";
 import * as auditService from "./audit.service.js"; 
 
-// Helper de seguridad multi-tenant
 const getTenantFilter = (user) => {
   if (!user || !user.hotelId) return {}; 
   return { hotelId: user.hotelId };
@@ -38,7 +36,6 @@ export const getMaintenances = async ({ skip, take, where, sortBy, order }, user
             area: { select: { nombre: true, departamento: { select: { nombre: true } } } }
           }
         },
-        // 👇 INCLUIMOS HOTEL
         hotel: { select: { nombre: true, codigo: true } }
       },
       skip: skip,
@@ -77,21 +74,18 @@ export const getMaintenanceById = (id, user) => {
 };
 
 export const createMaintenance = async (data, user) => {
-  // 1. Buscamos el dispositivo para ver su hotel
+
   const device = await prisma.device.findUnique({ where: { id: Number(data.deviceId) } });
   if (!device) throw new Error("Dispositivo no encontrado.");
 
-  // 2. Seguridad: Si el usuario tiene hotelId, debe coincidir con el del dispositivo
-  // Esto evita que un admin de Cancún programe manto a un equipo de Sensira sabiendo su ID.
   if (user.hotelId && device.hotelId !== user.hotelId) {
       throw new Error("No puedes programar mantenimiento para un equipo que no pertenece a tu hotel.");
   }
 
-  // 3. Crear el mantenimiento HEREDANDO el hotelId del dispositivo
   const newManto = await prisma.maintenance.create({ 
       data: {
           ...data,
-          hotelId: device.hotelId // 🛡️ HERENCIA: El mantenimiento pertenece al mismo hotel que el equipo
+          hotelId: device.hotelId 
       } 
   });
 
@@ -112,7 +106,6 @@ export const updateMaintenance = async (id, data, user) => {
   const mantoId = Number(id);
   const tenantFilter = getTenantFilter(user);
   
-  // Verificamos existencia y permiso
   const oldManto = await prisma.maintenance.findFirst({ where: { id: mantoId, ...tenantFilter } });
   if (!oldManto) throw new Error("Mantenimiento no encontrado o sin permisos.");
 

@@ -4,22 +4,18 @@ import prisma from "../PrismaClient.js";
 import { ROLES } from "../config/constants.js";
 import ExcelJS from "exceljs";
 
-// --- HELPER: SANITIZAR USUARIO ---
 const sanitizeUsername = (text) => {
     if (!text) return "";
     return text.trim().toLowerCase().replace(/\s+/g, '');
 };
 
-// --- LOGIN ---
 export const login = async (req, res, next) => {
   try {
     const { password } = req.body;
-    
-    // Limpieza de datos
+
     const identifier = sanitizeUsername(req.body.identifier);
     const cleanPassword = password ? password.trim() : "";
     
-    // 1. Buscar usuario
     const user = await prisma.userSistema.findFirst({
       where: {
         OR: [{ email: identifier }, { username: identifier }],
@@ -32,14 +28,12 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // 2. Verificar password
     const isMatch = await bcrypt.compare(cleanPassword, user.password);
     
     if (!isMatch) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // 3. Generar token
     const token = jwt.sign(
       { id: user.id, rol: user.rol }, 
       process.env.JWT_SECRET || "secreto_super_seguro",
@@ -54,11 +48,10 @@ export const login = async (req, res, next) => {
       user: userWithoutPassword,
     });
   } catch (error) {
-    next(error); // Pasa el error al middleware de manejo de errores
+    next(error);
   }
 };
 
-// --- CREAR USUARIO ---
 export const createUser = async (req, res, next) => {
   try {
     const { nombre, rol, hotelIds } = req.body; 
@@ -103,7 +96,6 @@ export const createUser = async (req, res, next) => {
   }
 };
 
-// --- EDITAR USUARIO ---
 export const updateUserController = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -142,7 +134,6 @@ export const updateUserController = async (req, res, next) => {
     }
 }
 
-// --- ACTUALIZAR PASSWORD ---
 export const updatePassword = async (req, res) => {
   try {
     const { id } = req.params;
@@ -175,7 +166,6 @@ export const updatePassword = async (req, res) => {
   }
 };
 
-// ... (El resto de funciones: getUsers, getUser, deleteUser, exportSystemUsers se mantienen igual, ya estaban limpias)
 export const getUsers = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, search = "", sortBy = "nombre", order = "asc" } = req.query;

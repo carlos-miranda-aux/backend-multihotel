@@ -11,10 +11,8 @@ import { ROLES } from "../config/constants.js";
 
 const router = Router();
 
-// Endpoint público para selector (ya existente)
 router.get("/list", verifyToken, getAvailableHotels);
 
-// Endpoints administrativos (Solo ROOT)
 router.get("/admin/list", verifyToken, verifyRole([ROLES.ROOT]), getAllHotelsAdmin);
 router.post("/post", verifyToken, verifyRole([ROLES.ROOT]), createHotel);
 router.put("/put/:id", verifyToken, verifyRole([ROLES.ROOT]), updateHotel);

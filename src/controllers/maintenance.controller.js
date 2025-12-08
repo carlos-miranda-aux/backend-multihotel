@@ -1,4 +1,3 @@
-// src/controllers/maintenance.controller.js
 import * as maintenanceService from "../services/maintenance.service.js";
 import ExcelJS from "exceljs";
 import { MAINTENANCE_STATUS } from "../config/constants.js"; 
@@ -31,7 +30,6 @@ export const getMaintenances = async (req, res, next) => {
       };
     }
     
-    // 👈 PASAMOS req.user para filtrar
     const { maintenances, totalCount } = await maintenanceService.getMaintenances({ 
       skip, 
       take: limit, 
@@ -58,7 +56,6 @@ export const getMaintenance = async (req, res, next) => {
 
 export const createMaintenance = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
     const newMaintenance = await maintenanceService.createMaintenance(req.body, req.user);
     res.status(201).json(newMaintenance);
   } catch (error) {
@@ -109,7 +106,7 @@ export const exportMaintenances = async (req, res, next) => {
       skip: 0, 
       take: undefined, 
       where: {} 
-    }, req.user); // 👈 req.user para filtrar exportación
+    }, req.user);
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Mantenimientos");
@@ -169,7 +166,6 @@ export const exportMaintenances = async (req, res, next) => {
 export const exportIndividualMaintenance = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // 👈 PASAMOS req.user
     const maintenance = await maintenanceService.getMaintenanceById(id, req.user);
 
     if (!maintenance) return res.status(404).json({ error: "Mantenimiento no encontrado o sin permisos" });

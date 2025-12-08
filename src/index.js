@@ -1,4 +1,3 @@
-// src/index.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -6,7 +5,7 @@ import prisma from "./PrismaClient.js";
 import cron from "node-cron"; 
 import { sendMaintenanceReminder } from "./utils/email.service.js"; 
 import { preloadMasterData } from "./utils/preloadData.js";
-// 👇 IMPORTANTE: Importamos las constantes
+
 import { MAINTENANCE_STATUS } from "./config/constants.js"; 
 
 // Importar rutas
@@ -55,14 +54,11 @@ app.listen(PORT, async () => {
   try {
     await prisma.$connect();
 
-    // 👇 Carga de datos maestros (admin, catalogos, etc)
     await preloadMasterData();
 
   } catch (err) {
     console.error(err);
   }
-
-  // --- TAREA PROGRAMADA (CRON) ---
 
   //cron.schedule('* * * * *', async () => {
   cron.schedule('0 9 * * *', async () => {
@@ -78,7 +74,6 @@ app.listen(PORT, async () => {
 
       const maintenances = await prisma.maintenance.findMany({
         where: {
-          // 👇 CORREGIDO: Usamos la constante en lugar del string mágico
           estado: MAINTENANCE_STATUS.PENDING, 
           deletedAt: null, 
           OR: [

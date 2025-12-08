@@ -1,4 +1,3 @@
-// src/controllers/device.controller.js
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
@@ -15,7 +14,6 @@ export const getDevices = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
-    // 👈 PASAMOS req.user al servicio
     const { devices, totalCount } = await deviceService.getActiveDevices({ 
         skip, 
         take: limit, 
@@ -39,7 +37,7 @@ export const getDevices = async (req, res, next) => {
 
 export const getAllActiveDeviceNames = async (req, res, next) => {
     try {
-      // 👈 PASAMOS req.user
+
       const devices = await deviceService.getAllActiveDeviceNames(req.user);
       res.json(devices); 
     } catch (error) {
@@ -49,7 +47,7 @@ export const getAllActiveDeviceNames = async (req, res, next) => {
   
 export const getDevice = async (req, res, next) => {
     try {
-        // 👈 PASAMOS req.user
+
         const device = await deviceService.getDeviceById(req.params.id, req.user);
         if (!device) return res.status(404).json({ error: "Dispositivo no encontrado o no tienes acceso a este hotel." });
         res.json(device);
@@ -60,7 +58,7 @@ export const getDevice = async (req, res, next) => {
 
 export const getPandaStatus = async (req, res, next) => {
     try {
-        // 👈 PASAMOS req.user
+
         const counts = await deviceService.getPandaStatusCounts(req.user);
         res.json(counts);
     } catch (error) {
@@ -70,7 +68,7 @@ export const getPandaStatus = async (req, res, next) => {
 
 export const getDashboardData = async (req, res, next) => {
     try {
-        // 👈 PASAMOS req.user
+
         const stats = await deviceService.getDashboardStats(req.user);
         res.json(stats);
     } catch (error) {
@@ -101,18 +99,17 @@ export const createDevice = async (req, res, next) => {
         observaciones_baja: null 
       };
 
-      // PASAMOS req.user (El servicio inyectará el hotelId)
       const newDevice = await deviceService.createDevice(dataToCreate, req.user);
       
       if (fecha_proxima_revision) {
-        // Crear mantenimiento inicial vinculado al mismo hotel del equipo
+
         await prisma.maintenance.create({
           data: {
             descripcion: "Revisión preventiva inicial",
             fecha_programada: new Date(fecha_proxima_revision),
             estado: "pendiente",
             deviceId: newDevice.id,
-            hotelId: newDevice.hotelId, // 👈 Importante: Vincular mantenimiento al hotel
+            hotelId: newDevice.hotelId,
             diagnostico: "Programado", 
             acciones_realizadas: "Pendiente de revisión",
             observaciones: ""
@@ -156,7 +153,6 @@ export const updateDevice = async (req, res, next) => {
 
 export const deleteDevice = async (req, res, next) => {
     try {
-      // El servicio ahora valida si el usuario tiene permiso sobre este dispositivo
       await deviceService.deleteDevice(req.params.id, req.user);
       
       res.json({ message: "Dispositivo eliminado" });
@@ -167,12 +163,12 @@ export const deleteDevice = async (req, res, next) => {
 
 export const exportInactiveDevices = async (req, res, next) => {
     try {
-      // PASAMOS req.user
+
       const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }, req.user); 
       
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Dispositivos Inactivos");
-      // ... (Configuración de columnas igual que antes) ...
+
       worksheet.columns = [
         { header: "N°", key: "numero", width: 10 },
         { header: "Etiqueta", key: "etiqueta", width: 15 },
@@ -222,12 +218,10 @@ export const exportInactiveDevices = async (req, res, next) => {
 
 export const exportAllDevices = async (req, res, next) => {
     try {
-      // PASAMOS req.user
       const { devices } = await deviceService.getActiveDevices({ skip: 0, take: undefined }, req.user);
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Inventario Activo");
-      
-      // ... (Configuración de columnas igual que antes) ...
+
        worksheet.columns = [
         { header: "Etiqueta", key: "etiqueta", width: 20 },
         { header: "Nombre Equipo", key: "nombre_equipo", width: 25 },
@@ -313,10 +307,9 @@ export const importDevices = async (req, res, next) => {
 export const exportCorrectiveAnalysis = async (req, res, next) => {
     try {
         const { startDate, endDate } = req.query; 
-        // PASAMOS req.user
+
         const analysisData = await deviceService.getExpiredWarrantyAnalysis(startDate, endDate, req.user);
-        
-        // ... (Exportación Excel igual que antes) ...
+
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("Analisis Garantia-Correctivos"); 
         

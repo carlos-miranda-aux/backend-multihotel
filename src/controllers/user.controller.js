@@ -1,4 +1,3 @@
-// src/controllers/user.controller.js
 import * as userService from "../services/user.service.js";
 import ExcelJS from "exceljs";
 
@@ -13,7 +12,6 @@ export const getUsers = async (req, res, next) => {
     
     const skip = (page - 1) * limit;
 
-    // Si limit es 0, devolvemos todo (pero filtrado por el hotel del usuario)
     if (limit === 0) {
         const { users } = await userService.getUsers({ 
             skip: 0, 
@@ -58,7 +56,6 @@ export const getUser = async (req, res, next) => {
 
 export const createUser = async (req, res, next) => {
   try {
-    // El servicio asignará el hotel automáticamente basado en req.user
     const user = await userService.createUser(req.body, req.user);
     res.status(201).json(user);
   } catch (error) {
@@ -86,7 +83,6 @@ export const deleteUser = async (req, res, next) => {
 
 export const exportUsers = async (req, res, next) => {
   try {
-    // Usamos el servicio con el filtro de usuario para obtener solo sus empleados
     const { users } = await userService.getUsers({ skip: 0, take: undefined }, req.user); 
     
     const workbook = new ExcelJS.Workbook();
@@ -125,8 +121,7 @@ export const exportUsers = async (req, res, next) => {
 export const importUsers = async (req, res, next) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      
-      // 🔥 CORRECCIÓN: Leemos el hotelId del body (enviado por el frontend)
+
       const targetHotelId = req.body.hotelId ? Number(req.body.hotelId) : null;
 
       const result = await userService.importUsersFromExcel(req.file.buffer, req.user, targetHotelId);

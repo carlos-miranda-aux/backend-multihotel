@@ -12,7 +12,6 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   
   if (sortBy) {
       if (sortBy.includes('.')) {
-          // Manejo de relaciones anidadas
           const parts = sortBy.split('.');
           if (parts.length === 2) {
              orderBy = { [parts[0]]: { [parts[1]]: order } };
@@ -32,7 +31,7 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
       where: whereClause,
       include: { 
           departamento: true,
-          hotel: { select: { nombre: true, id: true } } // Incluimos hotel para mostrar nombre
+          hotel: { select: { nombre: true, id: true } } 
       },
       skip: skip,
       take: take,
@@ -44,7 +43,6 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   return { areas, totalCount };
 };
 
-// ... (Resto del archivo igual: createArea, updateArea, deleteArea, etc.)
 export const getAllAreas = (user) => {
   const tenantFilter = getTenantFilter(user);
   return prisma.area.findMany({

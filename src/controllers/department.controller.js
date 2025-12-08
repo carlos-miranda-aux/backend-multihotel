@@ -8,7 +8,6 @@ export const getDepartments = async (req, res, next) => {
     const order = req.query.order || "asc";
     const skip = (page - 1) * limit;
 
-    // Si limit es 0, devolvemos todo (pero filtrado por el hotel del usuario)
     if (isNaN(limit) || limit === 0 || req.query.limit === undefined || req.query.limit === '0') {
         const departments = await departmentService.getAllDepartments(req.user); // 👈 req.user
         return res.json(departments);
@@ -34,7 +33,6 @@ export const getDepartment = async (req, res, next) => {
 
 export const createDepartment = async (req, res, next) => {
   try {
-    // El servicio tomará el hotelId del usuario automáticamente
     const department = await departmentService.createDepartment(req.body, req.user);
     res.status(201).json(department);
   } catch (error) {

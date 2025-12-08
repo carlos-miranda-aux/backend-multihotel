@@ -1,4 +1,3 @@
-// src/services/auth.service.js
 import prisma from "../PrismaClient.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -10,7 +9,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecreto";
 export const registerUser = async (data, adminUser) => {
   const hashedPassword = await bcrypt.hash(data.password, 10);
   
-  // Lógica para vincular Hoteles (Conexión Muchos a Muchos)
   let hotelsToConnect = [];
   if (data.hotelIds && Array.isArray(data.hotelIds) && data.hotelIds.length > 0) {
       hotelsToConnect = data.hotelIds.map(id => ({ id: Number(id) }));
@@ -57,11 +55,9 @@ export const loginUser = async ({ identifier, password }) => {
   if (!user) throw new Error("Usuario no encontrado");
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword) throw new Error("Contraseña incorrecta");
-  
-  // Extraemos IDs para el token (Seguridad rápida en Middleware)
+
   const allowedHotelIds = user.hotels.map(h => h.id);
 
-  // Registro de Auditoría de Login
   await auditService.logActivity({
       action: 'LOGIN',
       entity: 'Auth',
@@ -75,8 +71,8 @@ export const loginUser = async ({ identifier, password }) => {
       id: user.id, 
       username: user.username, 
       rol: user.rol, 
-      hotels: user.hotels, // Info visual (nombres, ids)
-      allowedHotels: allowedHotelIds // Lista de IDs permitidos
+      hotels: user.hotels,
+      allowedHotels: allowedHotelIds
     },
     JWT_SECRET,
     { expiresIn: "60d" }
@@ -98,17 +94,14 @@ export const loginUser = async ({ identifier, password }) => {
 export const getUsers = async ({ skip, take, sortBy, order }, adminUser) => {
   const whereClause = { deletedAt: null }; 
   
-  // 🛡️ LÓGICA DE FILTRADO MULTI-TENANT
-  // 1. Si hay un contexto de hotel activo (seleccionado en el frontend), filtramos por ese hotel.
   if (adminUser.hotelId) {
       whereClause.hotels = { some: { id: adminUser.hotelId } };
   } 
-  // 2. Si es usuario regional (sin contexto específico), ve todos sus hoteles asignados.
+
   else if (adminUser.rol !== ROLES.ROOT && adminUser.hotels && adminUser.hotels.length > 0) {
       const myHotelIds = adminUser.hotels.map(h => h.id);
       whereClause.hotels = { some: { id: { in: myHotelIds } } };
   }
-  // 3. Si es ROOT sin contexto, ve todo (whereClause se queda limpio).
 
   const orderBy = sortBy ? { [sortBy]: order } : { nombre: 'asc' };
 
@@ -132,7 +125,7 @@ export const getUserById = (id, adminUser) => {
       id: Number(id),
       deletedAt: null,
     },
-    include: { hotels: true }, // Importante para la edición (ver qué hoteles tiene)
+    include: { hotels: true },
   });
 };
 
@@ -175,7 +168,6 @@ export const updateUser = async (id, data, adminUser) => {
   if (rol) updateData.rol = rol;
   if (password) updateData.password = await bcrypt.hash(password, 10);
 
-  // Actualizar Hoteles (Reemplazo completo de la relación)
   if (hotelIds && Array.isArray(hotelIds)) {
       updateData.hotels = {
           set: hotelIds.map(id => ({ id: Number(id) }))

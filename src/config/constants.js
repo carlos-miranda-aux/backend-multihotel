@@ -1,5 +1,3 @@
-// src/config/constants.js
-
 export const ROLES = {
   ROOT: "ROOT",  //Dev
   CORP_VIEWER: "CORP_VIEWER",  //Global lecture

@@ -1,16 +1,15 @@
-// src/utils/email.service.js
+
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
-// Cargar variables de entorno
 dotenv.config();
 
-// Función para crear el transporter
+
 const createTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST || "smtp.gmail.com",
     port: 465,
-    secure: true, // true para puerto 465
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -18,16 +17,13 @@ const createTransporter = () => {
     tls: {
       rejectUnauthorized: false,
     },
-    family: 4 // Fuerza IPv4 para estabilidad
+    family: 4 
   });
 };
 
-/**
- * Plantilla de correo para RECORDATORIO de Mantenimiento.
- */
+
 export const sendMaintenanceReminder = async (maintenance, manager, daysUntil) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.error("❌ Error: Faltan credenciales de correo en el archivo .env");
     return;
   }
 
@@ -82,8 +78,7 @@ export const sendMaintenanceReminder = async (maintenance, manager, daysUntil) =
     const transporter = createTransporter();
     await transporter.verify(); 
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Correo de RECORDATORIO (${daysUntil} días) enviado a: ${manager.correo}`);
   } catch (error) {
-    console.error(`❌ Error al enviar correo de RECORDATORIO a ${manager.correo}:`, error.code || error.message);
+    console.error(`Error al enviar correo de RECORDATORIO a ${manager.correo}:`, error.code || error.message);
   }
 };

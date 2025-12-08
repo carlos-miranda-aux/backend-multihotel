@@ -1,7 +1,6 @@
 import prisma from "../PrismaClient.js";
 import * as auditService from "./audit.service.js";
 
-// Obtener lista para selectores (ya existía lógica similar, la formalizamos)
 export const getAllHotels = async () => {
   return prisma.hotel.findMany({
     where: { deletedAt: null },
@@ -62,7 +61,6 @@ export const updateHotel = async (id, data, user) => {
 export const deleteHotel = async (id, user) => {
   const hotelId = Number(id);
   
-  // Validar dependencias antes de borrar (opcional, Prisma lanzaría error si hay restrict)
   const oldHotel = await prisma.hotel.findUnique({ where: { id: hotelId } });
 
   const deleted = await prisma.hotel.update({

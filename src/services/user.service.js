@@ -1,11 +1,6 @@
-// src/services/user.service.js
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 import * as auditService from "./audit.service.js"; 
-
-// =====================================================================
-// SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
-// =====================================================================
 
 const getTenantFilter = (user) => {
   if (!user || !user.hotelId) return {}; 
@@ -40,7 +35,6 @@ export const getUsers = async ({ skip, take, search, sortBy, order }, user) => {
       where: whereClause,
       include: {
         area: { include: { departamento: true } },
-        // 👇 INCLUIMOS HOTEL
         hotel: { select: { nombre: true, codigo: true } }
       },
       skip: skip,
@@ -173,10 +167,6 @@ export const deleteUser = async (id, user) => {
   return deleted;
 };
 
-// =====================================================================
-// SECCIÓN 2: HELPERS PARA IMPORTACIÓN
-// =====================================================================
-
 const clean = (txt) => txt ? txt.toString().trim() : "";
 const cleanLower = (txt) => clean(txt).toLowerCase();
 
@@ -219,20 +209,11 @@ const resolveArea = (data, context) => {
   return areaId;
 };
 
-// =====================================================================
-// SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
-// =====================================================================
-
-// 🔥 CORRECCIÓN: Agregamos el parámetro targetHotelId
 export const importUsersFromExcel = async (buffer, user) => {
-  // 🔥 VALIDACIÓN DE SEGURIDAD ESTRICTA
-  // Solo permitimos importar si el usuario tiene asignado EXACTAMENTE UN HOTEL.
-  // Esto bloquea a Root (0 hoteles directos) y a Regionales (>1 hoteles) para evitar ambigüedades.
   if (!user.hotels || user.hotels.length !== 1) {
       throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones masivas. Si eres usuario Global o Regional, contacta al administrador local.");
   }
 
-  // Obtenemos el ID fijo del usuario
   const hotelIdToImport = user.hotels[0].id;
 
   const workbook = new ExcelJS.Workbook();
@@ -242,7 +223,6 @@ export const importUsersFromExcel = async (buffer, user) => {
   const usersToCreate = [];
   const errors = [];
 
-  // Cargamos SOLO las áreas de este hotel
   const areas = await prisma.area.findMany({
     where: { 
         deletedAt: null,
@@ -275,7 +255,7 @@ export const importUsersFromExcel = async (buffer, user) => {
       areaId,
       usuario_login: rowData.usuario_login,
       es_jefe_de_area: rowData.es_jefe_de_area,
-      hotelId: hotelIdToImport // Asignamos el hotel automáticamente
+      hotelId: hotelIdToImport
     });
   });
 

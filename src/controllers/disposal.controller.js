@@ -1,4 +1,3 @@
-// src/controllers/disposal.controller.js
 import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 
@@ -9,7 +8,6 @@ export const getDisposals = async (req, res, next) => {
     const search = req.query.search || ""; 
     const skip = (page - 1) * limit;
 
-    // 👈 PASAMOS req.user al servicio de dispositivos
     const { devices, totalCount } = await deviceService.getInactiveDevices({ skip, take: limit, search }, req.user);
     
     res.json({
@@ -25,7 +23,6 @@ export const getDisposals = async (req, res, next) => {
 
 export const getDisposal = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user para filtrar
     const disposal = await deviceService.getDeviceById(req.params.id, req.user); 
     if (!disposal) return res.status(404).json({ error: "Baja no encontrada o sin permisos" });
     res.json(disposal);
@@ -36,7 +33,6 @@ export const getDisposal = async (req, res, next) => {
 
 export const updateDisposal = async (req, res, next) => {
   try {
-    // Verificamos existencia y permiso primero
     const oldDisposal = await deviceService.getDeviceById(req.params.id, req.user);
     if (!oldDisposal) return res.status(404).json({ message: "Baja no encontrada o sin permisos" });
     
@@ -45,7 +41,6 @@ export const updateDisposal = async (req, res, next) => {
       observaciones_baja: req.body.observaciones_baja
     };
 
-    // Actualizamos pasando req.user
     const disposal = await deviceService.updateDevice(req.params.id, dataToUpdate, req.user);
     res.json(disposal);
   } catch (error) {
@@ -63,7 +58,6 @@ export const deleteDisposal = async (req, res, next) => {
 
 export const exportDisposalsExcel = async (req, res, next) => {
   try {
-    // 👈 PASAMOS req.user
     const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }, req.user); 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Bajas de Equipos");

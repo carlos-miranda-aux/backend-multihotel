@@ -12,7 +12,6 @@ import { ROLES } from "../config/constants.js";
 const router = Router();
 
 const READ_ALL = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
-// Permitimos a Admins Locales crear tipos si es necesario, aunque afecta a todos
 const CATALOG_ADMIN = [ROLES.ROOT, ROLES.HOTEL_ADMIN]; 
 
 router.get("/get", verifyToken, verifyRole(READ_ALL), getDeviceTypes);

@@ -8,13 +8,11 @@ export const getOperatingSystems = async (req, res, next) => {
     const order = req.query.order || "asc";
     const skip = (page - 1) * limit;
 
-    // Selector: Si limit es 0, devolvemos todo sin paginar
     if (isNaN(limit) || limit === 0 || req.query.limit === '0') {
         const allOs = await operatingSystemService.getAllOperatingSystems();
         return res.json(allOs);
     }
 
-    // Tabla: Paginado y ordenado
     const { operatingSystems, totalCount } = await operatingSystemService.getOperatingSystems({ 
         skip, 
         take: limit, 

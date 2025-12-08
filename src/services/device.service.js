@@ -1,26 +1,18 @@
-// src/services/device.service.js
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js";
 import * as auditService from "./audit.service.js"; 
 
-// =====================================================================
-// HELPER DE SEGURIDAD MULTI-TENANT
-// =====================================================================
 const getTenantFilter = (user) => {
   if (!user || !user.hotelId) return {}; // Root (Global) ve todo
   return { hotelId: user.hotelId }; // Admin Local solo ve su hotel
 };
 
-// =====================================================================
-// SECCIÓN 1: FUNCIONES CRUD ESTÁNDAR
-// =====================================================================
-
 export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }, user) => {
   const tenantFilter = getTenantFilter(user);
 
   const whereClause = {
-    ...tenantFilter, // 🛡️ FILTRO DE SEGURIDAD
+    ...tenantFilter,
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
     deletedAt: null 
   };
@@ -102,10 +94,9 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
 };
 
 export const createDevice = async (data, user) => {
-  // 🛡️ ASIGNACIÓN AUTOMÁTICA DE HOTEL
+
   let hotelIdToAssign = user.hotelId;
   
-  // Si es ROOT y no tiene hotelId en el token, debe venir en la data
   if (!hotelIdToAssign && data.hotelId) {
       hotelIdToAssign = Number(data.hotelId);
   }
@@ -137,12 +128,11 @@ export const updateDevice = async (id, data, user) => {
   const deviceId = Number(id);
   const tenantFilter = getTenantFilter(user);
 
-  // Verificamos que el dispositivo exista Y pertenezca al hotel del usuario
   const oldDevice = await prisma.device.findFirst({
     where: { 
         id: deviceId, 
         deletedAt: null,
-        ...tenantFilter // 🛡️ Seguridad
+        ...tenantFilter 
     }
   });
 
@@ -189,7 +179,7 @@ export const deleteDevice = async (id, user) => {
   const oldDevice = await prisma.device.findFirst({ 
       where: { 
           id: deviceId,
-          ...tenantFilter // 🛡️ Seguridad
+          ...tenantFilter 
       } 
   });
 
@@ -219,7 +209,7 @@ export const getDeviceById = (id, user) => {
     where: {
       id: Number(id),
       deletedAt: null,
-      ...tenantFilter // 🛡️ Seguridad
+      ...tenantFilter 
     },
     include: {
       usuario: true,
@@ -238,14 +228,14 @@ export const getAllActiveDeviceNames = (user) => {
     where: {
       estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
       deletedAt: null,
-      ...tenantFilter // 🛡️ Seguridad
+      ...tenantFilter 
     },
     select: {
       id: true,
       etiqueta: true,
       nombre_equipo: true,
       tipo: { select: { nombre: true } },
-      hotelId: true // Útil para el selector del Root
+      hotelId: true 
     },
     orderBy: { etiqueta: 'asc' }
   });
@@ -257,7 +247,7 @@ export const getInactiveDevices = async ({ skip, take, search }, user) => {
   const whereClause = {
     estado: { nombre: DEVICE_STATUS.DISPOSED },
     deletedAt: null,
-    ...tenantFilter // 🛡️ Seguridad
+    ...tenantFilter 
   };
 
   if (search) {
@@ -297,7 +287,7 @@ export const getPandaStatusCounts = async (user) => {
   const baseWhere = {
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
     deletedAt: null,
-    ...tenantFilter // 🛡️ Seguridad
+    ...tenantFilter 
   };
 
   const totalActiveDevices = await prisma.device.count({ where: baseWhere });
@@ -341,7 +331,7 @@ export const getDashboardStats = async (user) => {
   const activeFilter = {
     estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
     deletedAt: null,
-    ...tenantFilter // 🛡️ Seguridad
+    ...tenantFilter 
   };
 
   const [
@@ -350,7 +340,7 @@ export const getDashboardStats = async (user) => {
     expiredWarranty,
     riskWarranty,
     currentMonthDisposals,
-    totalStaff, // 👈 DATO NUEVO: Conteo de personal
+    totalStaff,
     warrantyAlerts
   ] = await prisma.$transaction([
     // 1. Activos
@@ -367,17 +357,17 @@ export const getDashboardStats = async (user) => {
         estado: { nombre: DEVICE_STATUS.DISPOSED },
         fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() },
         deletedAt: null,
-        ...tenantFilter // 🛡️ Seguridad
+        ...tenantFilter 
       }
     }),
-    // 6. Total Staff (Usuarios finales)
+
     prisma.user.count({
         where: {
             deletedAt: null,
-            ...tenantFilter // 🛡️ Seguridad (Solo personal de mi hotel)
+            ...tenantFilter 
         }
     }),
-    // 7. Lista de alertas de garantía
+
     prisma.device.findMany({
       where: {
         ...activeFilter,
@@ -405,7 +395,7 @@ export const getDashboardStats = async (user) => {
       devicesWithPanda: withPanda,
       devicesWithoutPanda: withoutPanda,
       monthlyDisposals: currentMonthDisposals,
-      totalStaff: totalStaff // 👈 Se envía al frontend
+      totalStaff: totalStaff 
     },
     warrantyStats: {
       expired: expiredWarranty,
@@ -415,10 +405,6 @@ export const getDashboardStats = async (user) => {
     warrantyAlertsList: warrantyAlerts
   };
 };
-
-// =====================================================================
-// SECCIÓN 2: HELPERS PARA IMPORTACIÓN
-// =====================================================================
 
 const clean = (txt) => txt ? txt.toString().trim() : "";
 const cleanLower = (txt) => clean(txt).toLowerCase();
@@ -515,12 +501,7 @@ const resolveForeignKeys = (data, context) => {
   return { usuarioId, areaId };
 };
 
-// =====================================================================
-// SECCIÓN 3: FUNCIÓN PRINCIPAL DE IMPORTACIÓN
-// =====================================================================
-
 export const importDevicesFromExcel = async (buffer, user) => {
-  // 🔥 VALIDACIÓN ESTRICTA
   if (!user.hotels || user.hotels.length !== 1) {
       throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones de inventario.");
   }
@@ -531,7 +512,7 @@ export const importDevicesFromExcel = async (buffer, user) => {
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
-  // Cargamos contexto del hotel
+
   const [areas, users] = await Promise.all([
     prisma.area.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport }, include: { departamento: true } }),
     prisma.user.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport } }),
@@ -609,7 +590,7 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
       garantia_fin: {
         lt: today.toISOString()
       },
-      ...tenantFilter // 🛡️ Seguridad
+      ...tenantFilter
     },
     include: {
       tipo: { select: { nombre: true } },

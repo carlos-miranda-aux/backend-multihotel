@@ -7,12 +7,11 @@ import {
 } from "../controllers/device.controller.js";
 import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 import { validateCreateDevice, validateUpdateDevice } from "../validators/device.validator.js";
-import { ROLES } from "../config/constants.js"; // 👈 Importante
+import { ROLES } from "../config/constants.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
-// Permisos definidos
 const READ_ALL = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX, ROLES.CORP_VIEWER, ROLES.HOTEL_GUEST];
 const EDIT_ACCESS = [ROLES.ROOT, ROLES.HOTEL_ADMIN, ROLES.HOTEL_AUX];
 const ADMIN_ONLY = [ROLES.ROOT, ROLES.HOTEL_ADMIN];

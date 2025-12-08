@@ -1,4 +1,3 @@
-// src/services/deviceType.service.js
 import prisma from "../../src/PrismaClient.js";
 import * as auditService from "./audit.service.js"; // 👈 IMPORTAR
 

@@ -1,14 +1,12 @@
 import prisma from "../../src/PrismaClient.js";
 import * as auditService from "./audit.service.js"; 
 
-// 🛡️ Helper para aislar datos por hotel
 const getTenantFilter = (user) => {
   if (!user || !user.hotelId) return {}; 
   return { hotelId: user.hotelId }; 
 };
 
 export const getDepartments = async ({ skip, take, sortBy, order }, user) => {
-  // Soporte para ordenar por nombre de hotel
   let orderBy = { nombre: 'asc' };
   if (sortBy) {
       if (sortBy.includes('.')) {
@@ -26,7 +24,6 @@ export const getDepartments = async ({ skip, take, sortBy, order }, user) => {
     prisma.department.findMany({
       where: whereClause,
       include: { 
-          // 👇 INCLUIMOS DATOS DEL HOTEL
           hotel: { select: { nombre: true, codigo: true } } 
       },
       skip: skip,
@@ -52,16 +49,14 @@ export const getDepartmentById = (id, user) => {
     where: { 
         id: Number(id), 
         deletedAt: null, 
-        ...tenantFilter // Solo si pertenece a mi hotel
+        ...tenantFilter
     },
   });
 };
 
 export const createDepartment = async (data, user) => {
-  // 🛡️ ASIGNACIÓN AUTOMÁTICA DE UBICACIÓN
   let hotelIdToAssign = user.hotelId;
   
-  // Si es Root, permitimos que elija el hotel, si no, es obligatorio su propio hotel
   if (!hotelIdToAssign && data.hotelId) hotelIdToAssign = Number(data.hotelId);
   
   if (!hotelIdToAssign) throw new Error("No se puede crear un departamento sin asignar un Hotel.");
@@ -69,7 +64,7 @@ export const createDepartment = async (data, user) => {
   const newDept = await prisma.department.create({ 
       data: {
           nombre: data.nombre,
-          hotelId: hotelIdToAssign // 👈 Aquí se fija la ubicación
+          hotelId: hotelIdToAssign
       }
   });
 
@@ -89,7 +84,6 @@ export const updateDepartment = async (id, data, user) => {
   const deptId = Number(id);
   const tenantFilter = getTenantFilter(user);
 
-  // Verificamos propiedad antes de editar
   const oldDept = await prisma.department.findFirst({ 
       where: { id: deptId, ...tenantFilter } 
   });
@@ -98,7 +92,7 @@ export const updateDepartment = async (id, data, user) => {
 
   const updatedDept = await prisma.department.update({
     where: { id: deptId },
-    data: { nombre: data.nombre }, // Solo permitimos cambiar nombre, no hotel
+    data: { nombre: data.nombre },
   });
 
   await auditService.logActivity({
