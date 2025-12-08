@@ -220,6 +220,29 @@ export const importUsersFromExcel = async (buffer, user) => {
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
+  // --- 1. LEER ENCABEZADOS ---
+  const headerMap = {};
+  worksheet.getRow(1).eachCell((cell, colNumber) => {
+    headerMap[cleanLower(cell.value)] = colNumber;
+  });
+
+  // --- 2. VALIDAR ENCABEZADOS (NUEVO) ---
+  // Definimos qué columnas son OBLIGATORIAS para aceptar el archivo
+  const requiredColumns = ['nombre']; // 'Nombre' es indispensable
+  const secondaryColumns = ['correo', 'email', 'área', 'area', 'departamento', 'usuario', 'login']; // Al menos una de estas debería existir para que el archivo tenga sentido
+
+  // Verificar columna obligatoria
+  if (!headerMap['nombre']) {
+      throw new Error("El archivo no es válido: Falta la columna 'Nombre' en el encabezado.");
+  }
+
+  // Verificar que tenga algo más que solo nombre (para evitar archivos de otra cosa)
+  const hasSecondaryData = secondaryColumns.some(col => headerMap[col]);
+  if (!hasSecondaryData) {
+       throw new Error("El archivo no parece ser un reporte de Staff válido. Faltan columnas clave como 'Correo', 'Área' o 'Departamento'.");
+  }
+  // --- FIN VALIDACIÓN ---
+
   const usersToCreate = [];
   const errors = [];
 
@@ -236,21 +259,18 @@ export const importUsersFromExcel = async (buffer, user) => {
     areasList: areas
   };
 
-  const headerMap = {};
-  worksheet.getRow(1).eachCell((cell, colNumber) => {
-    headerMap[cleanLower(cell.value)] = colNumber;
-  });
-
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
 
     const rowData = extractRowData(row, headerMap);
+
+    // Si la fila no tiene nombre, la saltamos (es basura o fila vacía)
+    if (!rowData.nombre) return; 
+
     const areaId = resolveArea(rowData, context);
 
-    const nombreFinal = rowData.nombre || `Usuario Sin Nombre Fila ${rowNumber}`;
-
     usersToCreate.push({
-      nombre: nombreFinal,
+      nombre: rowData.nombre,
       correo: rowData.correo,
       areaId,
       usuario_login: rowData.usuario_login,
@@ -258,6 +278,10 @@ export const importUsersFromExcel = async (buffer, user) => {
       hotelId: hotelIdToImport
     });
   });
+
+  if (usersToCreate.length === 0) {
+      throw new Error("No se encontraron registros válidos para importar en el archivo.");
+  }
 
   let successCount = 0;
 

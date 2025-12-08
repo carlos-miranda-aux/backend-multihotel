@@ -1,21 +1,32 @@
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js";
-import * as auditService from "./audit.service.js"; 
+import * as auditService from "./audit.service.js";
 
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; // Root (Global) ve todo
-  return { hotelId: user.hotelId }; // Admin Local solo ve su hotel
+  if (!user || !user.hotelId) return {};
+  return { hotelId: user.hotelId };
 };
 
 export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }, user) => {
   const tenantFilter = getTenantFilter(user);
 
+  const disposedStatus = await prisma.deviceStatus.findFirst({
+    where: { nombre: DEVICE_STATUS.DISPOSED }
+  });
+  const disposedStatusId = disposedStatus?.id;
+
   const whereClause = {
     ...tenantFilter,
-    estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-    deletedAt: null 
+    deletedAt: null
   };
+
+  // CORRECCIÓN: Usar 'not' en minúsculas para filtro escalar
+  if (disposedStatusId) {
+    whereClause.estadoId = { not: disposedStatusId };
+  } else {
+    whereClause.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
+  }
 
   if (search) {
     whereClause.AND = whereClause.AND || [];
@@ -94,22 +105,21 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
 };
 
 export const createDevice = async (data, user) => {
-
   let hotelIdToAssign = user.hotelId;
-  
+
   if (!hotelIdToAssign && data.hotelId) {
-      hotelIdToAssign = Number(data.hotelId);
-  }
-  
-  if (!hotelIdToAssign) {
-      throw new Error("Error crítico: No se puede crear un dispositivo sin asignar un Hotel (Tenant).");
+    hotelIdToAssign = Number(data.hotelId);
   }
 
-  const newDevice = await prisma.device.create({ 
-      data: {
-          ...data,
-          hotelId: hotelIdToAssign 
-      }
+  if (!hotelIdToAssign) {
+    throw new Error("Error crítico: No se puede crear un dispositivo sin asignar un Hotel (Tenant).");
+  }
+
+  const newDevice = await prisma.device.create({
+    data: {
+      ...data,
+      hotelId: hotelIdToAssign
+    }
   });
 
   await auditService.logActivity({
@@ -129,10 +139,10 @@ export const updateDevice = async (id, data, user) => {
   const tenantFilter = getTenantFilter(user);
 
   const oldDevice = await prisma.device.findFirst({
-    where: { 
-        id: deviceId, 
-        deletedAt: null,
-        ...tenantFilter 
+    where: {
+      id: deviceId,
+      deletedAt: null,
+      ...tenantFilter
     }
   });
 
@@ -142,14 +152,13 @@ export const updateDevice = async (id, data, user) => {
   const disposedStatusId = disposedStatus?.id;
 
   if (disposedStatusId) {
-    // Reactivación
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
+      // Reactivación: Limpiar datos de baja
       data.fecha_baja = null;
       data.motivo_baja = null;
       data.observaciones_baja = null;
-    }
-    // Baja
-    else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
+    } else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
+      // Baja: Asignar fecha actual
       data.fecha_baja = new Date();
     }
   }
@@ -176,11 +185,11 @@ export const deleteDevice = async (id, user) => {
   const deviceId = Number(id);
   const tenantFilter = getTenantFilter(user);
 
-  const oldDevice = await prisma.device.findFirst({ 
-      where: { 
-          id: deviceId,
-          ...tenantFilter 
-      } 
+  const oldDevice = await prisma.device.findFirst({
+    where: {
+      id: deviceId,
+      ...tenantFilter
+    }
   });
 
   if (!oldDevice) throw new Error("Dispositivo no encontrado o sin permisos.");
@@ -204,12 +213,12 @@ export const deleteDevice = async (id, user) => {
 
 export const getDeviceById = (id, user) => {
   const tenantFilter = getTenantFilter(user);
-  
+
   return prisma.device.findFirst({
     where: {
       id: Number(id),
       deletedAt: null,
-      ...tenantFilter 
+      ...tenantFilter
     },
     include: {
       usuario: true,
@@ -221,21 +230,33 @@ export const getDeviceById = (id, user) => {
   });
 };
 
-export const getAllActiveDeviceNames = (user) => {
+export const getAllActiveDeviceNames = async (user) => {
   const tenantFilter = getTenantFilter(user);
 
+  const disposedStatus = await prisma.deviceStatus.findFirst({
+    where: { nombre: DEVICE_STATUS.DISPOSED }
+  });
+  const disposedStatusId = disposedStatus?.id;
+
+  const whereClause = {
+    deletedAt: null,
+    ...tenantFilter
+  };
+
+  if (disposedStatusId) {
+    whereClause.estadoId = { not: disposedStatusId };
+  } else {
+    whereClause.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
+  }
+
   return prisma.device.findMany({
-    where: {
-      estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-      deletedAt: null,
-      ...tenantFilter 
-    },
+    where: whereClause,
     select: {
       id: true,
       etiqueta: true,
       nombre_equipo: true,
       tipo: { select: { nombre: true } },
-      hotelId: true 
+      hotelId: true
     },
     orderBy: { etiqueta: 'asc' }
   });
@@ -244,11 +265,21 @@ export const getAllActiveDeviceNames = (user) => {
 export const getInactiveDevices = async ({ skip, take, search }, user) => {
   const tenantFilter = getTenantFilter(user);
 
+  const disposedStatus = await prisma.deviceStatus.findFirst({
+    where: { nombre: DEVICE_STATUS.DISPOSED }
+  });
+  const disposedStatusId = disposedStatus?.id;
+
   const whereClause = {
-    estado: { nombre: DEVICE_STATUS.DISPOSED },
     deletedAt: null,
-    ...tenantFilter 
+    ...tenantFilter
   };
+
+  if (disposedStatusId) {
+    whereClause.estadoId = disposedStatusId;
+  } else {
+    whereClause.estado = { nombre: DEVICE_STATUS.DISPOSED };
+  }
 
   if (search) {
     whereClause.AND = {
@@ -284,11 +315,21 @@ export const getInactiveDevices = async ({ skip, take, search }, user) => {
 export const getPandaStatusCounts = async (user) => {
   const tenantFilter = getTenantFilter(user);
 
+  const disposedStatus = await prisma.deviceStatus.findFirst({
+    where: { nombre: DEVICE_STATUS.DISPOSED }
+  });
+  const disposedStatusId = disposedStatus?.id;
+
   const baseWhere = {
-    estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
     deletedAt: null,
-    ...tenantFilter 
+    ...tenantFilter
   };
+
+  if (disposedStatusId) {
+    baseWhere.estadoId = { not: disposedStatusId };
+  } else {
+    baseWhere.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
+  }
 
   const totalActiveDevices = await prisma.device.count({ where: baseWhere });
 
@@ -315,7 +356,7 @@ export const getPandaStatusCounts = async (user) => {
 
 export const getDashboardStats = async (user) => {
   const tenantFilter = getTenantFilter(user);
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -328,11 +369,33 @@ export const getDashboardStats = async (user) => {
   const lastDayMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
   lastDayMonth.setHours(23, 59, 59, 999);
 
+  const disposedStatus = await prisma.deviceStatus.findFirst({
+    where: { nombre: DEVICE_STATUS.DISPOSED }
+  });
+  const disposedStatusId = disposedStatus?.id;
+
   const activeFilter = {
-    estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
     deletedAt: null,
-    ...tenantFilter 
+    ...tenantFilter
   };
+
+  if (disposedStatusId) {
+    activeFilter.estadoId = { not: disposedStatusId };
+  } else {
+    activeFilter.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
+  }
+
+  const disposalFilter = {
+    deletedAt: null,
+    fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() },
+    ...tenantFilter
+  };
+
+  if (disposedStatusId) {
+    disposalFilter.estadoId = disposedStatusId;
+  } else {
+    disposalFilter.estado = { nombre: DEVICE_STATUS.DISPOSED };
+  }
 
   const [
     totalActive,
@@ -343,31 +406,17 @@ export const getDashboardStats = async (user) => {
     totalStaff,
     warrantyAlerts
   ] = await prisma.$transaction([
-    // 1. Activos
     prisma.device.count({ where: activeFilter }),
-    // 2. Panda
     prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
-    // 3. Garantía vencida
     prisma.device.count({ where: { ...activeFilter, garantia_fin: { lt: today.toISOString() } } }),
-    // 4. Garantía riesgo
     prisma.device.count({ where: { ...activeFilter, garantia_fin: { gte: today.toISOString(), lte: ninetyDaysFromNow.toISOString() } } }),
-    // 5. Bajas del mes
-    prisma.device.count({
+    prisma.device.count({ where: disposalFilter }),
+    prisma.user.count({
       where: {
-        estado: { nombre: DEVICE_STATUS.DISPOSED },
-        fecha_baja: { gte: firstDayMonth.toISOString(), lte: lastDayMonth.toISOString() },
         deletedAt: null,
-        ...tenantFilter 
+        ...tenantFilter
       }
     }),
-
-    prisma.user.count({
-        where: {
-            deletedAt: null,
-            ...tenantFilter 
-        }
-    }),
-
     prisma.device.findMany({
       where: {
         ...activeFilter,
@@ -395,7 +444,7 @@ export const getDashboardStats = async (user) => {
       devicesWithPanda: withPanda,
       devicesWithoutPanda: withoutPanda,
       monthlyDisposals: currentMonthDisposals,
-      totalStaff: totalStaff 
+      totalStaff: totalStaff
     },
     warrantyStats: {
       expired: expiredWarranty,
@@ -503,7 +552,7 @@ const resolveForeignKeys = (data, context) => {
 
 export const importDevicesFromExcel = async (buffer, user) => {
   if (!user.hotels || user.hotels.length !== 1) {
-      throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones de inventario.");
+    throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones de inventario.");
   }
 
   const hotelIdToImport = user.hotels[0].id;
@@ -512,6 +561,22 @@ export const importDevicesFromExcel = async (buffer, user) => {
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
+  // --- 1. LEER Y VALIDAR ENCABEZADOS ---
+  const headerMap = {};
+  worksheet.getRow(1).eachCell((cell, colNumber) => {
+    headerMap[cleanLower(cell.value)] = colNumber;
+  });
+
+  const validNameHeaders = ['nombre equipo', 'nombre'];
+  const validSerialHeaders = ['n° serie', 'serie', 'numero serie', 'serial', 'sn'];
+  
+  const hasName = validNameHeaders.some(h => headerMap[h]);
+  const hasSerial = validSerialHeaders.some(h => headerMap[h]);
+
+  if (!hasName && !hasSerial) {
+      throw new Error("El archivo no parece ser un inventario válido. Faltan columnas obligatorias como 'Nombre Equipo' o 'N° Serie'.");
+  }
+  // --- FIN VALIDACIÓN ---
 
   const [areas, users] = await Promise.all([
     prisma.area.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport }, include: { departamento: true } }),
@@ -525,15 +590,14 @@ export const importDevicesFromExcel = async (buffer, user) => {
     areasList: areas
   };
 
-  const headerMap = {};
-  worksheet.getRow(1).eachCell((cell, colNumber) => {
-    headerMap[cleanLower(cell.value)] = colNumber;
-  });
-
   const devicesToProcess = [];
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
     const rowData = extractRowData(row, headerMap);
+
+    // Si no tiene nombre ni serie, es una fila vacía
+    if (!rowData.nombre_equipo && !rowData.serie) return;
+
     const foreignKeys = resolveForeignKeys(rowData, context);
     const finalNombre = rowData.nombre_equipo || `Equipo Fila ${rowNumber}`;
     const finalSerie = rowData.serie || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
@@ -559,11 +623,11 @@ export const importDevicesFromExcel = async (buffer, user) => {
       const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, caches.status);
       const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, caches.os);
 
-      const finalData = { ...item.deviceData, tipoId, estadoId, sistemaOperativoId, hotelId: hotelIdToImport }; 
+      const finalData = { ...item.deviceData, tipoId, estadoId, sistemaOperativoId, hotelId: hotelIdToImport };
 
       const exists = await prisma.device.findFirst({ where: { numero_serie: finalData.numero_serie, hotelId: hotelIdToImport } });
 
-      if (!exists) { await prisma.device.create({ data: finalData }); } 
+      if (!exists) { await prisma.device.create({ data: finalData }); }
       else { await prisma.device.update({ where: { id: exists.id }, data: { ...finalData, deletedAt: null } }); }
       successCount++;
     } catch (error) {
@@ -580,18 +644,28 @@ export const importDevicesFromExcel = async (buffer, user) => {
 export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
   const tenantFilter = getTenantFilter(user);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const disposedStatus = await prisma.deviceStatus.findFirst({
+    where: { nombre: DEVICE_STATUS.DISPOSED }
+  });
+  const disposedStatusId = disposedStatus?.id;
+
+  const whereClause = {
+    deletedAt: null,
+    garantia_fin: {
+      lt: new Date().toISOString()
+    },
+    ...tenantFilter
+  };
+
+  // CORRECCIÓN: Usar 'not' en minúsculas
+  if (disposedStatusId) {
+    whereClause.estadoId = { not: disposedStatusId };
+  } else {
+    whereClause.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
+  }
 
   const devices = await prisma.device.findMany({
-    where: {
-      estado: { NOT: { nombre: DEVICE_STATUS.DISPOSED } },
-      deletedAt: null,
-      garantia_fin: {
-        lt: today.toISOString()
-      },
-      ...tenantFilter
-    },
+    where: whereClause,
     include: {
       tipo: { select: { nombre: true } },
       maintenances: {
@@ -618,6 +692,9 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
       garantia_fin: 'asc'
     }
   });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   return devices.map(d => {
     const correctives = d.maintenances.filter(m =>
