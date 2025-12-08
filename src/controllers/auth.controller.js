@@ -5,7 +5,6 @@ import { ROLES } from "../config/constants.js";
 import ExcelJS from "exceljs";
 
 // --- HELPER: SANITIZAR USUARIO ---
-// Esta función elimina espacios y fuerza minúsculas
 const sanitizeUsername = (text) => {
     if (!text) return "";
     return text.trim().toLowerCase().replace(/\s+/g, '');
@@ -16,13 +15,11 @@ export const login = async (req, res, next) => {
   try {
     const { password } = req.body;
     
-    // Aplicamos la misma limpieza al intentar loguear
+    // Limpieza de datos
     const identifier = sanitizeUsername(req.body.identifier);
     const cleanPassword = password ? password.trim() : "";
     
-    console.log("\n========================================");
-    console.log("🔍 [LOGIN] Usuario limpio:", identifier);
-
+    // 1. Buscar usuario
     const user = await prisma.userSistema.findFirst({
       where: {
         OR: [{ email: identifier }, { username: identifier }],
@@ -32,17 +29,17 @@ export const login = async (req, res, next) => {
     });
 
     if (!user) {
-      console.log("❌ [LOGIN FALLO] Usuario no encontrado.");
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
+    // 2. Verificar password
     const isMatch = await bcrypt.compare(cleanPassword, user.password);
     
     if (!isMatch) {
-      console.log("❌ [LOGIN FALLO] Password incorrecto.");
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
+    // 3. Generar token
     const token = jwt.sign(
       { id: user.id, rol: user.rol }, 
       process.env.JWT_SECRET || "secreto_super_seguro",
@@ -51,17 +48,13 @@ export const login = async (req, res, next) => {
 
     const { password: _, ...userWithoutPassword } = user;
 
-    console.log("🚀 [LOGIN ÉXITO] Acceso concedido.");
-    console.log("========================================\n");
-
     res.json({
       message: "Login exitoso",
       token,
       user: userWithoutPassword,
     });
   } catch (error) {
-    console.error("💥 [LOGIN ERROR]:", error);
-    next(error);
+    next(error); // Pasa el error al middleware de manejo de errores
   }
 };
 
@@ -70,13 +63,9 @@ export const createUser = async (req, res, next) => {
   try {
     const { nombre, rol, hotelIds } = req.body; 
     
-    // 🔥 LIMPIEZA AGRESIVA
-    // " Juan Perez " -> "juanperez"
     const username = sanitizeUsername(req.body.username);
     const email = req.body.email ? req.body.email.trim() : "";
     const cleanPassword = req.body.password ? req.body.password.trim() : "";
-
-    console.log(`🔵 [CREAR] Usuario final: '${username}'`);
 
     if (username.length < 3) {
         return res.status(400).json({ error: "El usuario debe tener al menos 3 caracteres." });
@@ -100,14 +89,15 @@ export const createUser = async (req, res, next) => {
       data: {
         nombre, 
         email, 
-        username, // Se guarda limpio
+        username,
         password: hashedPassword, 
         rol: rol || "HOTEL_GUEST",
         hotels: { connect: hotelsConnect }
       },
     });
 
-    res.status(201).json(newUser);
+    const { password: _, ...createdUser } = newUser;
+    res.status(201).json(createdUser);
   } catch (error) {
     next(error);
   }
@@ -119,7 +109,6 @@ export const updateUserController = async (req, res, next) => {
         const { id } = req.params;
         const { nombre, rol, hotelIds, password } = req.body;
         
-        // 🔥 LIMPIEZA AGRESIVA EN EDICIÓN TAMBIÉN
         const username = sanitizeUsername(req.body.username);
         const email = req.body.email ? req.body.email.trim() : "";
 
@@ -130,7 +119,6 @@ export const updateUserController = async (req, res, next) => {
 
         if (password && password.trim() !== "") {
             const cleanPass = password.trim();
-            console.log(`🔐 [UPDATE] Reseteando password para ID ${id}.`);
             updateData.password = await bcrypt.hash(cleanPass, 10);
         }
         
@@ -154,19 +142,40 @@ export const updateUserController = async (req, res, next) => {
     }
 }
 
-// ... (Resto de funciones: updatePassword, getUsers, getUser, deleteUser, exportSystemUsers SE MANTIENEN IGUAL)
+// --- ACTUALIZAR PASSWORD ---
 export const updatePassword = async (req, res) => {
   try {
     const { id } = req.params;
     const { password } = req.body;
-    if (!password || password.trim() === "") return res.status(400).json({ error: "Contraseña requerida" });
+
+    if (!password || password.trim() === "") {
+      return res.status(400).json({ error: "La contraseña es obligatoria." });
+    }
+
     const cleanPass = password.trim();
+
+    const requestingUser = req.user; 
+    const isSelf = requestingUser.id === Number(id);
+    const isAdmin = [ROLES.ROOT, ROLES.HOTEL_ADMIN].includes(requestingUser.rol);
+
+    if (!isSelf && !isAdmin) {
+        return res.status(403).json({ error: "No tienes permiso para cambiar esta contraseña." });
+    }
+
     const hashedPassword = await bcrypt.hash(cleanPass, 10);
-    await prisma.userSistema.update({ where: { id: Number(id) }, data: { password: hashedPassword } });
-    res.json({ message: "Contraseña actualizada" });
-  } catch (error) { res.status(500).json({ error: "Error al actualizar contraseña" }); }
+
+    await prisma.userSistema.update({
+      where: { id: Number(id) },
+      data: { password: hashedPassword },
+    });
+
+    return res.status(200).json({ message: "Contraseña actualizada correctamente." });
+  } catch (error) {
+    next(error);
+  }
 };
 
+// ... (El resto de funciones: getUsers, getUser, deleteUser, exportSystemUsers se mantienen igual, ya estaban limpias)
 export const getUsers = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, search = "", sortBy = "nombre", order = "asc" } = req.query;
