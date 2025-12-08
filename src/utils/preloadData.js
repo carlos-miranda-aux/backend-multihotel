@@ -106,8 +106,6 @@ export const preloadMasterData = async () => {
                 }
             }
         }
-
-        console.log("Verificando Super Admin...");
         
         const rootUser = await prisma.userSistema.findUnique({ where: { username: "root" } });
         
