@@ -172,11 +172,18 @@ export const deleteDevice = async (req, res, next) => {
 
 export const exportInactiveDevices = async (req, res, next) => {
     try {
+      // Capturamos fechas opcionales del query params
+      const { startDate, endDate } = req.query;
 
-      const { devices } = await deviceService.getInactiveDevices({ skip: 0, take: undefined }, req.user); 
+      const { devices } = await deviceService.getInactiveDevices({ 
+          skip: 0, 
+          take: undefined, 
+          startDate, 
+          endDate 
+      }, req.user); 
       
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Dispositivos Inactivos");
+      const worksheet = workbook.addWorksheet("Bajas de Equipos");
 
       worksheet.columns = [
         { header: "N°", key: "numero", width: 10 },
@@ -193,6 +200,7 @@ export const exportInactiveDevices = async (req, res, next) => {
         { header: "Departamento", key: "departamento", width: 25 }, 
         { header: "Motivo", key: "motivo_baja", width: 30 },
         { header: "Observaciones", key: "observaciones_baja", width: 40 },
+        { header: "Fecha Baja", key: "fecha_baja", width: 15 }, // Agregado para referencia
       ];
       
       devices.forEach((device, index) => {
@@ -211,6 +219,7 @@ export const exportInactiveDevices = async (req, res, next) => {
           departamento: device.area?.departamento?.nombre || "N/A", 
           motivo_baja: device.motivo_baja || "N/A",
           observaciones_baja: device.observaciones_baja || "N/A",
+          fecha_baja: device.fecha_baja ? new Date(device.fecha_baja).toLocaleDateString() : "N/A"
         });
       });
   
