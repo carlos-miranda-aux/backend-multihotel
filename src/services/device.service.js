@@ -262,7 +262,7 @@ export const getAllActiveDeviceNames = async (user) => {
   });
 };
 
-export const getInactiveDevices = async ({ skip, take, search }, user) => {
+export const getInactiveDevices = async ({ skip, take, search, startDate, endDate }, user) => {
   const tenantFilter = getTenantFilter(user);
 
   const disposedStatus = await prisma.deviceStatus.findFirst({
@@ -290,6 +290,14 @@ export const getInactiveDevices = async ({ skip, take, search }, user) => {
         { motivo_baja: { contains: search } },
       ]
     };
+  }
+
+  // LOGICA PARA FILTRO POR FECHAS (Nuevo)
+  if (startDate && endDate) {
+      whereClause.fecha_baja = {
+          gte: new Date(startDate).toISOString(),
+          lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString()
+      };
   }
 
   const [devices, totalCount] = await prisma.$transaction([
