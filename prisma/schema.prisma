@@ -12,6 +12,7 @@ model Hotel {
   nombre      String    @unique 
   codigo      String    @unique 
   direccion   String?
+  ciudad      String?   // Campo nuevo para el formato de resguardo
   logoUrl     String?
   activo      Boolean   @default(true)
   
@@ -117,6 +118,7 @@ model Device {
   id                       Int       @id @default(autoincrement())
   hotel                    Hotel     @relation(fields: [hotelId], references: [id])
   hotelId                  Int
+  
   etiqueta                 String?
   nombre_equipo            String
   descripcion              String?

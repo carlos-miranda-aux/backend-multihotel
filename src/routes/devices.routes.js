@@ -3,7 +3,8 @@ import multer from "multer";
 import {
   getDevices, getDevice, createDevice, updateDevice, deleteDevice,
   getAllActiveDeviceNames, exportInactiveDevices, exportAllDevices,
-  importDevices, exportCorrectiveAnalysis, getPandaStatus, getDashboardData
+  importDevices, exportCorrectiveAnalysis, getPandaStatus, getDashboardData,
+  exportResguardo // IMPORTAR
 } from "../controllers/device.controller.js";
 import { verifyRole, verifyToken } from "../middlewares/auth.middleware.js";
 import { validateCreateDevice, validateUpdateDevice } from "../validators/device.validator.js";
@@ -30,5 +31,7 @@ router.get("/export/inactivos", verifyToken, verifyRole(EDIT_ACCESS), exportInac
 router.get("/export/all", verifyToken, verifyRole(EDIT_ACCESS), exportAllDevices);
 router.post("/import", verifyToken, verifyRole(ADMIN_ONLY), upload.single("file"), importDevices);
 router.get("/export/corrective-analysis", verifyToken, verifyRole(EDIT_ACCESS), exportCorrectiveAnalysis);
+
+router.get("/export/resguardo/:id", verifyToken, verifyRole(READ_ALL), exportResguardo);
 
 export default router;
