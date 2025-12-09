@@ -2,6 +2,15 @@ import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
 import { DEVICE_STATUS } from "../config/constants.js"; 
+// Nuevos imports para docxtemplater
+import PizZip from "pizzip";
+import Docxtemplater from "docxtemplater";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const getDevices = async (req, res, next) => {
   try {
@@ -348,6 +357,86 @@ export const exportCorrectiveAnalysis = async (req, res, next) => {
         res.end();
 
     } catch (error) {
+        next(error);
+    }
+};
+
+export const exportResguardo = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        
+        const device = await deviceService.getDeviceById(id, req.user);
+
+        if (!device) {
+            return res.status(404).json({ error: "Dispositivo no encontrado o acceso denegado." });
+        }
+
+        const templatePath = path.resolve(__dirname, "../templates/resguardo_template.docx");
+        
+        if (!fs.existsSync(templatePath)) {
+            return res.status(500).json({ error: "No se encontró la plantilla 'resguardo_template.docx' en src/templates/." });
+        }
+
+        const content = fs.readFileSync(templatePath, "binary");
+
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+        });
+
+        const today = new Date();
+        const optionsMonth = { month: 'long' }; 
+        const mesActual = today.toLocaleDateString('es-MX', optionsMonth);
+
+        const tipoEquipo = device.tipo?.nombre ? device.tipo.nombre.toUpperCase() : "EQUIPO";
+        
+        // Logica para obtener la ciudad desde el hotel, con fallback a direccion o texto default
+        let ubicacion = "Cancún, Quintana Roo"; 
+        if (device.hotel) {
+            if (device.hotel.ciudad) {
+                ubicacion = device.hotel.ciudad;
+            } else if (device.hotel.direccion) {
+                ubicacion = device.hotel.direccion; 
+            }
+        }
+
+        const data = {
+            lugar: ubicacion, 
+            dia: today.getDate(),
+            mes: mesActual,
+            año: today.getFullYear(),
+            
+            tipo: tipoEquipo, 
+            marca: device.marca || "GENÉRICA",
+            modelo: device.modelo || "GENÉRICO",
+            color: "NA", 
+            serie: device.numero_serie || "S/N",
+            nombre_empleado: device.usuario ? device.usuario.nombre.toUpperCase() : "______________________",
+        };
+
+        doc.render(data);
+
+        const buf = doc.getZip().generate({
+            type: "nodebuffer",
+            compression: "DEFLATE",
+        });
+
+        const fileName = `Resguardo_${tipoEquipo}_${device.nombre_equipo}.docx`.replace(/ /g, "_");
+        
+        res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        res.send(buf);
+
+    } catch (error) {
+        console.error("Error generando resguardo:", error);
+        
+        if (error.properties && error.properties.errors) {
+            const errorMessages = error.properties.errors.map(e => e.message).join(", ");
+            console.error("Detalle error plantilla:", errorMessages);
+            return res.status(400).json({ error: `Error en la plantilla Word: ${errorMessages}` });
+        }
+        
         next(error);
     }
 };
