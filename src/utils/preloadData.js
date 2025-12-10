@@ -25,7 +25,7 @@ const CATALOGS = {
 const STANDARD_STRUCTURE = [
     { 
         depto: "Gerencia General", 
-        areas: ["Gerencia General"] 
+        areas: ["Gerencia General", "General"] 
     },
     { 
         depto: "Capital Humano", 
@@ -33,11 +33,11 @@ const STANDARD_STRUCTURE = [
     },
     { 
         depto: "Contraloría", 
-        areas: ["Contabilidad", "Compras", "Almacén", "Costos", "Sistemas"] 
+        areas: ["Contabilidad", "Compras", "Almacén", "Costos", "Sistemas", "Contraloria", "Ingresos","Calidad"] 
     },
     { 
         depto: "División Cuartos", 
-        areas: ["Recepción", "Ama de Llaves", "Seguridad", "Teléfonos", "Concierge", "Áreas Públicas"] 
+        areas: ["Recepción", "Ama de Llaves", "Seguridad", "Teléfonos", "Concierge", "Áreas Públicas", "División Cuartos", "Lavandería"] 
     },
     { 
         depto: "Mantenimiento", 
@@ -58,6 +58,14 @@ const STANDARD_STRUCTURE = [
     {
         depto: "Golden Shores",
         areas: ["Golden Shores"]
+    },
+    {
+        depto: "Spa",
+        areas: ["Spa"]
+    },
+    {
+        depto: "TI",
+        areas: ["TI"]
     }
 ];
 

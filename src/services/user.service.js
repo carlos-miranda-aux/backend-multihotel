@@ -167,21 +167,32 @@ export const deleteUser = async (id, user) => {
   return deleted;
 };
 
+// --- NORMALIZACIÓN ROBUSTA (Igual que en DeviceService) ---
 const clean = (txt) => txt ? txt.toString().trim() : "";
-const cleanLower = (txt) => clean(txt).toLowerCase();
+// Normaliza: minúsculas, sin acentos (NFD) y sin diacríticos especiales
+const cleanLower = (txt) => {
+    if (!txt) return "";
+    return txt.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
 
 const extractRowData = (row, headerMap) => {
-  const getVal = (key) => {
-    const colIdx = headerMap[key];
-    return colIdx ? row.getCell(colIdx).text?.trim() : null;
+  // Función auxiliar flexible para extraer datos de columnas con múltiples posibles nombres
+  const getVal = (possibleKeys) => {
+    const keys = Array.isArray(possibleKeys) ? possibleKeys : [possibleKeys];
+    for (const key of keys) {
+        // Busca la clave normalizada en el mapa de cabeceras
+        const idx = headerMap[cleanLower(key)];
+        if (idx) return row.getCell(idx).text?.trim();
+    }
+    return null;
   };
 
-  const nombreRaw = getVal('nombre');
-  const correo = getVal('correo') || getVal('email');
-  const areaNombre = getVal('área') || getVal('area');
-  const deptoNombre = getVal('departamento') || getVal('depto');
-  const usuario_login = getVal('usuario de login') || getVal('usuario') || getVal('login');
-  const esJefeRaw = getVal('es jefe') || getVal('jefe') || getVal('es jefe de area');
+  const nombreRaw = getVal(['nombre', 'nombre completo', 'empleado']);
+  const correo = getVal(['correo', 'email', 'e-mail']);
+  const areaNombre = getVal(['área', 'area', 'nombre area']); 
+  const deptoNombre = getVal(['departamento', 'depto', 'dept']);
+  const usuario_login = getVal(['usuario de login', 'usuario', 'login', 'user', 'usuario login']);
+  const esJefeRaw = getVal(['es jefe', 'jefe', 'es jefe de area', 'jefe area']);
 
   const es_jefe_de_area = ["si", "yes", "verdadero", "true"].includes(cleanLower(esJefeRaw));
 
@@ -198,10 +209,13 @@ const extractRowData = (row, headerMap) => {
 const resolveArea = (data, context) => {
   let areaId = null;
   if (data.areaNombre && data.deptoNombre) {
+    // Compara usando claves normalizadas (ej: "recepcion|division cuartos")
     const key = `${cleanLower(data.areaNombre)}|${cleanLower(data.deptoNombre)}`;
     areaId = context.areaMap.get(key);
 
     if (!areaId) {
+      // Intento de recuperación flexible: Buscar solo por nombre de área normalizado
+      // Esto ayuda si el departamento en el Excel tiene un nombre ligeramente diferente al de la BD
       const areasFound = context.areasList.filter(a => cleanLower(a.nombre) === cleanLower(data.areaNombre));
       if (areasFound.length === 1) areaId = areasFound[0].id;
     }
@@ -211,7 +225,7 @@ const resolveArea = (data, context) => {
 
 export const importUsersFromExcel = async (buffer, user) => {
   if (!user.hotels || user.hotels.length !== 1) {
-      throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones masivas. Si eres usuario Global o Regional, contacta al administrador local.");
+      throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones masivas.");
   }
 
   const hotelIdToImport = user.hotels[0].id;
@@ -220,32 +234,34 @@ export const importUsersFromExcel = async (buffer, user) => {
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
-  // --- 1. LEER ENCABEZADOS ---
+  // --- 1. LEER Y NORMALIZAR ENCABEZADOS ---
   const headerMap = {};
   worksheet.getRow(1).eachCell((cell, colNumber) => {
+    // Almacena la cabecera normalizada para búsquedas insensibles a acentos
     headerMap[cleanLower(cell.value)] = colNumber;
   });
 
-  // --- 2. VALIDAR ENCABEZADOS (NUEVO) ---
-  // Definimos qué columnas son OBLIGATORIAS para aceptar el archivo
-  const requiredColumns = ['nombre']; // 'Nombre' es indispensable
-  const secondaryColumns = ['correo', 'email', 'área', 'area', 'departamento', 'usuario', 'login']; // Al menos una de estas debería existir para que el archivo tenga sentido
+  // --- 2. VALIDAR COLUMNAS ---
+  const validNameHeaders = ['nombre', 'nombre completo', 'empleado'];
+  // Verificamos si existe alguna de las cabeceras válidas normalizadas
+  const hasName = validNameHeaders.some(h => headerMap[cleanLower(h)]);
 
-  // Verificar columna obligatoria
-  if (!headerMap['nombre']) {
+  if (!hasName) {
       throw new Error("El archivo no es válido: Falta la columna 'Nombre' en el encabezado.");
   }
 
-  // Verificar que tenga algo más que solo nombre (para evitar archivos de otra cosa)
-  const hasSecondaryData = secondaryColumns.some(col => headerMap[col]);
+  // Verificación secundaria para asegurar contexto
+  const secondaryColumns = ['correo', 'email', 'área', 'area', 'departamento', 'usuario', 'login']; 
+  const hasSecondaryData = secondaryColumns.some(col => headerMap[cleanLower(col)]);
+  
   if (!hasSecondaryData) {
        throw new Error("El archivo no parece ser un reporte de Staff válido. Faltan columnas clave como 'Correo', 'Área' o 'Departamento'.");
   }
-  // --- FIN VALIDACIÓN ---
 
   const usersToCreate = [];
   const errors = [];
 
+  // Obtenemos áreas de la BD para hacer el cruce
   const areas = await prisma.area.findMany({
     where: { 
         deletedAt: null,
@@ -254,7 +270,9 @@ export const importUsersFromExcel = async (buffer, user) => {
     include: { departamento: true }
   });
 
+  // Contexto con claves normalizadas (sin acentos)
   const context = {
+    // Mapa: "area|departamento" -> ID
     areaMap: new Map(areas.map(a => [`${cleanLower(a.nombre)}|${cleanLower(a.departamento?.nombre)}`, a.id])),
     areasList: areas
   };
@@ -264,7 +282,7 @@ export const importUsersFromExcel = async (buffer, user) => {
 
     const rowData = extractRowData(row, headerMap);
 
-    // Si la fila no tiene nombre, la saltamos (es basura o fila vacía)
+    // Si no tiene nombre, ignoramos la fila (puede ser fila vacía al final del excel)
     if (!rowData.nombre) return; 
 
     const areaId = resolveArea(rowData, context);
@@ -287,6 +305,7 @@ export const importUsersFromExcel = async (buffer, user) => {
 
   for (const u of usersToCreate) {
     try {
+      // Buscamos si el usuario ya existe por nombre exacto en este hotel
       const existing = await prisma.user.findFirst({ 
           where: { 
               nombre: u.nombre,

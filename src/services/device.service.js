@@ -21,7 +21,6 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
     deletedAt: null
   };
 
-  // CORRECCIÓN: Usar 'not' en minúsculas para filtro escalar
   if (disposedStatusId) {
     whereClause.estadoId = { not: disposedStatusId };
   } else {
@@ -292,7 +291,6 @@ export const getInactiveDevices = async ({ skip, take, search, startDate, endDat
     };
   }
 
-  // LOGICA PARA FILTRO POR FECHAS (Nuevo)
   if (startDate && endDate) {
       whereClause.fecha_baja = {
           gte: new Date(startDate).toISOString(),
@@ -463,8 +461,13 @@ export const getDashboardStats = async (user) => {
   };
 };
 
+// --- NORMALIZACIÓN COMPLETA PARA TODOS LOS CAMPOS ---
 const clean = (txt) => txt ? txt.toString().trim() : "";
-const cleanLower = (txt) => clean(txt).toLowerCase();
+// Convierte a minúsculas, elimina acentos y diacríticos
+const cleanLower = (txt) => {
+    if (!txt) return "";
+    return txt.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
 
 const parseExcelDate = (dateStr) => {
   if (!dateStr) return null;
@@ -476,20 +479,22 @@ const parseExcelDate = (dateStr) => {
   }
 };
 
+// Función auxiliar para buscar o crear catálogos, usando el caché normalizado
 const getOrCreateCatalog = async (modelName, value, cache) => {
   if (!value) return null;
+  // Clave normalizada (sin acentos)
   const key = cleanLower(value);
 
+  // 1. Buscamos en el caché precargado (que ya tiene claves normalizadas)
   if (cache.has(key)) return cache.get(key);
 
-  let item = await prisma[modelName].findFirst({ where: { nombre: value, deletedAt: null } });
-
-  if (!item) {
-    try {
-      item = await prisma[modelName].create({ data: { nombre: value } });
-    } catch (e) {
-      item = await prisma[modelName].findFirst({ where: { nombre: value } });
-    }
+  // 2. Si no existe, lo creamos.
+  let item;
+  try {
+    item = await prisma[modelName].create({ data: { nombre: value } });
+  } catch (e) {
+    // Si falla por unique constraint (race condition rara), intentamos buscarlo raw
+    item = await prisma[modelName].findFirst({ where: { nombre: value } });
   }
 
   if (item) {
@@ -500,45 +505,52 @@ const getOrCreateCatalog = async (modelName, value, cache) => {
 };
 
 const extractRowData = (row, headerMap) => {
-  const getVal = (key) => {
-    const idx = headerMap[key];
-    return idx ? row.getCell(idx).text?.trim() : null;
+  const getVal = (possibleKeys) => {
+    const keys = Array.isArray(possibleKeys) ? possibleKeys : [possibleKeys];
+    
+    for (const key of keys) {
+        // Busca la clave normalizada en el mapa
+        const idx = headerMap[cleanLower(key)];
+        if (idx) return row.getCell(idx).text?.trim();
+    }
+    return null;
   };
 
-  const rawOS = getVal('sistema operativo') || getVal('so') || getVal('os');
+  const rawOS = getVal(['sistema operativo', 'so', 'os']);
   const osStr = rawOS ? (rawOS.trim().charAt(0).toUpperCase() + rawOS.trim().slice(1).toLowerCase()) : null;
 
-  const pandaStr = getVal('antivirus') || getVal('panda') || getVal('es panda');
+  const pandaStr = getVal(['antivirus', 'panda', 'es panda', 'antivirus panda']);
   const es_panda = ["si", "yes", "verdadero", "true"].includes(cleanLower(pandaStr));
 
   return {
-    etiqueta: getVal('etiqueta'),
-    nombre_equipo: getVal('nombre equipo') || getVal('nombre'),
-    serie: getVal('n° serie') || getVal('serie') || getVal('numero serie') || getVal('serial'),
-    tipoStr: getVal('tipo') || DEFAULTS.DEVICE_TYPE,
-    estadoStr: getVal('estado') || DEVICE_STATUS.ACTIVE,
+    etiqueta: getVal(['etiqueta', 'tag']),
+    nombre_equipo: getVal(['nombre equipo', 'nombre', 'hostname']),
+    serie: getVal(['n° serie', 'serie', 'numero serie', 'serial', 'sn']),
+    tipoStr: getVal(['tipo', 'tipo dispositivo']) || DEFAULTS.DEVICE_TYPE,
+    estadoStr: getVal(['estado', 'status']) || DEVICE_STATUS.ACTIVE,
     osStr,
-    marca: getVal('marca') || DEFAULTS.BRAND,
-    modelo: getVal('modelo') || DEFAULTS.MODEL,
-    ip_equipo: getVal('ip') || getVal('ip equipo') || DEFAULTS.IP,
-    descripcion: getVal('descripcion') || "",
-    comentarios: getVal('comentarios') || getVal('observaciones') || getVal('notas'),
-    office_version: getVal('version office') || getVal('office version'),
-    office_licencia: getVal('tipo licencia') || getVal('tipo de licencia'),
-    garantia_num_prod: getVal('n producto') || getVal('garantia numero producto'),
-    garantia_inicio: parseExcelDate(getVal('inicio garantia') || getVal('garantia inicio')),
-    garantia_fin: parseExcelDate(getVal('fin garantia') || getVal('garantia fin')),
+    marca: getVal(['marca', 'brand']) || DEFAULTS.BRAND,
+    modelo: getVal(['modelo', 'model']) || DEFAULTS.MODEL,
+    ip_equipo: getVal(['ip', 'ip equipo', 'direccion ip']) || DEFAULTS.IP,
+    descripcion: getVal(['descripcion', 'description']) || "",
+    comentarios: getVal(['comentarios', 'observaciones', 'notas']) || null,
+    office_version: getVal(['version office', 'office version', 'office']),
+    office_licencia: getVal(['tipo licencia', 'tipo de licencia', 'licencia office']),
+    garantia_num_prod: getVal(['n producto', 'garantia numero producto', 'numero producto']),
+    garantia_inicio: parseExcelDate(getVal(['inicio garantia', 'garantia inicio', 'fecha compra'])),
+    garantia_fin: parseExcelDate(getVal(['fin garantia', 'garantia fin', 'vencimiento garantia'])),
     es_panda,
-    responsableLogin: getVal('usuario de login') || getVal('usuario login') || getVal('login') || getVal('usuarios') || getVal('usuario'),
-    responsableName: getVal('responsable (jefe') || getVal('responsable'),
-    perfiles: getVal('perfiles acceso') || getVal('perfiles') || getVal('perfiles de usuario'),
-    areaStr: getVal('área') || getVal('area'),
-    deptoStr: getVal('departamento')
+    responsableLogin: getVal(['usuario de login', 'usuario login', 'login', 'usuarios', 'usuario']),
+    responsableName: getVal(['responsable (jefe', 'responsable', 'nombre responsable']),
+    perfiles: getVal(['perfiles acceso', 'perfiles', 'perfiles de usuario']),
+    areaStr: getVal(['área', 'area']),
+    deptoStr: getVal(['departamento', 'depto'])
   };
 };
 
 const resolveForeignKeys = (data, context) => {
   let usuarioId = null;
+  // Búsqueda normalizada de usuarios
   if (data.responsableLogin) {
     usuarioId = context.userLoginMap.get(cleanLower(data.responsableLogin));
   }
@@ -547,6 +559,7 @@ const resolveForeignKeys = (data, context) => {
   }
 
   let areaId = null;
+  // Búsqueda normalizada de áreas/departamentos
   if (data.areaStr && data.deptoStr) {
     areaId = context.areaMap.get(`${cleanLower(data.areaStr)}|${cleanLower(data.deptoStr)}`);
   }
@@ -567,30 +580,45 @@ export const importDevicesFromExcel = async (buffer, user) => {
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
-  const worksheet = workbook.getWorksheet(1);
+  
+  // --- FIX: Obtención segura de la hoja ---
+  // Intentamos por ID (1) o por índice (0) si falla
+  let worksheet = workbook.getWorksheet(1);
+  if (!worksheet && workbook.worksheets.length > 0) {
+      worksheet = workbook.worksheets[0];
+  }
+  
+  if (!worksheet) {
+      throw new Error("El archivo Excel parece estar dañado o no contiene ninguna hoja de cálculo.");
+  }
+  // ----------------------------------------
 
-  // --- 1. LEER Y VALIDAR ENCABEZADOS ---
+  // --- 1. LEER Y VALIDAR ENCABEZADOS (Normalizados) ---
   const headerMap = {};
   worksheet.getRow(1).eachCell((cell, colNumber) => {
     headerMap[cleanLower(cell.value)] = colNumber;
   });
 
-  const validNameHeaders = ['nombre equipo', 'nombre'];
+  const validNameHeaders = ['nombre equipo', 'nombre', 'hostname'];
   const validSerialHeaders = ['n° serie', 'serie', 'numero serie', 'serial', 'sn'];
   
-  const hasName = validNameHeaders.some(h => headerMap[h]);
-  const hasSerial = validSerialHeaders.some(h => headerMap[h]);
+  const hasName = validNameHeaders.some(h => headerMap[cleanLower(h)]);
+  const hasSerial = validSerialHeaders.some(h => headerMap[cleanLower(h)]);
 
   if (!hasName && !hasSerial) {
       throw new Error("El archivo no parece ser un inventario válido. Faltan columnas obligatorias como 'Nombre Equipo' o 'N° Serie'.");
   }
-  // --- FIN VALIDACIÓN ---
 
-  const [areas, users] = await Promise.all([
+  // --- 2. CARGA DE CONTEXTO ---
+  const [areas, users, dbTypes, dbStatuses, dbOS] = await Promise.all([
     prisma.area.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport }, include: { departamento: true } }),
     prisma.user.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport } }),
+    prisma.deviceType.findMany({ where: { deletedAt: null } }),
+    prisma.deviceStatus.findMany({ where: { deletedAt: null } }),
+    prisma.operatingSystem.findMany({ where: { deletedAt: null } })
   ]);
 
+  // Mapas normalizados
   const context = {
     userLoginMap: new Map(users.filter(i => i.usuario_login).map(i => [cleanLower(i.usuario_login), i.id])),
     userNameMap: new Map(users.map(i => [cleanLower(i.nombre), i.id])),
@@ -598,15 +626,31 @@ export const importDevicesFromExcel = async (buffer, user) => {
     areasList: areas
   };
 
+  const caches = {
+    types: new Map(dbTypes.map(t => [cleanLower(t.nombre), t.id])),
+    status: new Map(dbStatuses.map(s => [cleanLower(s.nombre), s.id])),
+    os: new Map(dbOS.map(o => [cleanLower(o.nombre), o.id]))
+  };
+
   const devicesToProcess = [];
+  const warnings = []; // Lista para almacenar alertas de usuarios no encontrados
+
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
     const rowData = extractRowData(row, headerMap);
 
-    // Si no tiene nombre ni serie, es una fila vacía
     if (!rowData.nombre_equipo && !rowData.serie) return;
 
     const foreignKeys = resolveForeignKeys(rowData, context);
+    
+    // --- LÓGICA DE ALERTA DE USUARIOS ---
+    const hasUserInfo = rowData.responsableLogin || rowData.responsableName;
+    if (hasUserInfo && !foreignKeys.usuarioId) {
+        const userValue = rowData.responsableLogin || rowData.responsableName;
+        warnings.push(`Fila ${rowNumber} (${rowData.nombre_equipo || 'Sin Nombre'}): El usuario indicado '${userValue}' no se encontró en el sistema. El equipo se importará sin asignar usuario.`);
+    }
+    // ------------------------------------
+
     const finalNombre = rowData.nombre_equipo || `Equipo Fila ${rowNumber}`;
     const finalSerie = rowData.serie || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
 
@@ -623,7 +667,6 @@ export const importDevicesFromExcel = async (buffer, user) => {
 
   let successCount = 0;
   const errors = [];
-  const caches = { types: new Map(), status: new Map(), os: new Map() };
 
   for (const item of devicesToProcess) {
     try {
@@ -646,7 +689,8 @@ export const importDevicesFromExcel = async (buffer, user) => {
   if (successCount > 0) {
     await auditService.logActivity({ action: 'IMPORT', entity: 'Device', entityId: 0, details: `Importación masiva: ${successCount} equipos en Hotel ID: ${hotelIdToImport}.`, user: user });
   }
-  return { successCount, errors };
+  
+  return { successCount, errors, warnings };
 };
 
 export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
@@ -665,7 +709,6 @@ export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
     ...tenantFilter
   };
 
-  // CORRECCIÓN: Usar 'not' en minúsculas
   if (disposedStatusId) {
     whereClause.estadoId = { not: disposedStatusId };
   } else {
