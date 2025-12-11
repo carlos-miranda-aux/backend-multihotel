@@ -417,13 +417,17 @@ export const exportResguardo = async (req, res, next) => {
 
         const tipoEquipo = device.tipo?.nombre ? device.tipo.nombre.toUpperCase() : "EQUIPO";
         
-        // Logica para obtener la ciudad desde el hotel
-        let ubicacion = "Cancún, Quintana Roo"; 
+        // CORRECCIÓN: Lógica dinámica de ubicación
+        // Se elimina "Cancún, Quintana Roo" como hardcode.
+        let ubicacion = "LUGAR_NO_DEFINIDO"; 
+        
         if (device.hotel) {
             if (device.hotel.ciudad) {
                 ubicacion = device.hotel.ciudad;
             } else if (device.hotel.direccion) {
                 ubicacion = device.hotel.direccion; 
+            } else {
+                ubicacion = device.hotel.nombre; // Fallback al nombre del hotel
             }
         }
 
