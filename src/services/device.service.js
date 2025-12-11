@@ -157,8 +157,10 @@ export const updateDevice = async (id, data, user) => {
       data.motivo_baja = null;
       data.observaciones_baja = null;
     } else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
-      // Baja: Asignar fecha actual
-      data.fecha_baja = new Date();
+      // Baja: Asignar fecha actual solo si no viene una fecha manual en la data
+      if (!data.fecha_baja) {
+          data.fecha_baja = new Date();
+      }
     }
   }
 
@@ -225,6 +227,7 @@ export const getDeviceById = (id, user) => {
       estado: true,
       sistema_operativo: true,
       area: { include: { departamento: true } },
+      hotel: true
     },
   });
 };
@@ -255,7 +258,8 @@ export const getAllActiveDeviceNames = async (user) => {
       etiqueta: true,
       nombre_equipo: true,
       tipo: { select: { nombre: true } },
-      hotelId: true
+      hotelId: true,
+      usuario: { select: { id: true, nombre: true } } // Agregado para validación en frontend
     },
     orderBy: { etiqueta: 'asc' }
   });
@@ -461,9 +465,7 @@ export const getDashboardStats = async (user) => {
   };
 };
 
-// --- NORMALIZACIÓN COMPLETA PARA TODOS LOS CAMPOS ---
 const clean = (txt) => txt ? txt.toString().trim() : "";
-// Convierte a minúsculas, elimina acentos y diacríticos
 const cleanLower = (txt) => {
     if (!txt) return "";
     return txt.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -479,24 +481,16 @@ const parseExcelDate = (dateStr) => {
   }
 };
 
-// Función auxiliar para buscar o crear catálogos, usando el caché normalizado
 const getOrCreateCatalog = async (modelName, value, cache) => {
   if (!value) return null;
-  // Clave normalizada (sin acentos)
   const key = cleanLower(value);
-
-  // 1. Buscamos en el caché precargado (que ya tiene claves normalizadas)
   if (cache.has(key)) return cache.get(key);
-
-  // 2. Si no existe, lo creamos.
   let item;
   try {
     item = await prisma[modelName].create({ data: { nombre: value } });
   } catch (e) {
-    // Si falla por unique constraint (race condition rara), intentamos buscarlo raw
     item = await prisma[modelName].findFirst({ where: { nombre: value } });
   }
-
   if (item) {
     cache.set(key, item.id);
     return item.id;
@@ -507,9 +501,7 @@ const getOrCreateCatalog = async (modelName, value, cache) => {
 const extractRowData = (row, headerMap) => {
   const getVal = (possibleKeys) => {
     const keys = Array.isArray(possibleKeys) ? possibleKeys : [possibleKeys];
-    
     for (const key of keys) {
-        // Busca la clave normalizada en el mapa
         const idx = headerMap[cleanLower(key)];
         if (idx) return row.getCell(idx).text?.trim();
     }
@@ -544,13 +536,16 @@ const extractRowData = (row, headerMap) => {
     responsableName: getVal(['responsable (jefe', 'responsable', 'nombre responsable']),
     perfiles: getVal(['perfiles acceso', 'perfiles', 'perfiles de usuario']),
     areaStr: getVal(['área', 'area']),
-    deptoStr: getVal(['departamento', 'depto'])
+    deptoStr: getVal(['departamento', 'depto']),
+    // LECTURA DE FECHA DE BAJA PARA IMPORTACION
+    fecha_baja: parseExcelDate(getVal(['fecha baja', 'fecha de baja', 'baja', 'fecha_baja'])),
+    motivo_baja: getVal(['motivo', 'motivo baja']),
+    observaciones_baja: getVal(['observaciones baja', 'notas baja'])
   };
 };
 
 const resolveForeignKeys = (data, context) => {
   let usuarioId = null;
-  // Búsqueda normalizada de usuarios
   if (data.responsableLogin) {
     usuarioId = context.userLoginMap.get(cleanLower(data.responsableLogin));
   }
@@ -559,7 +554,6 @@ const resolveForeignKeys = (data, context) => {
   }
 
   let areaId = null;
-  // Búsqueda normalizada de áreas/departamentos
   if (data.areaStr && data.deptoStr) {
     areaId = context.areaMap.get(`${cleanLower(data.areaStr)}|${cleanLower(data.deptoStr)}`);
   }
@@ -581,8 +575,6 @@ export const importDevicesFromExcel = async (buffer, user) => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   
-  // --- FIX: Obtención segura de la hoja ---
-  // Intentamos por ID (1) o por índice (0) si falla
   let worksheet = workbook.getWorksheet(1);
   if (!worksheet && workbook.worksheets.length > 0) {
       worksheet = workbook.worksheets[0];
@@ -591,9 +583,7 @@ export const importDevicesFromExcel = async (buffer, user) => {
   if (!worksheet) {
       throw new Error("El archivo Excel parece estar dañado o no contiene ninguna hoja de cálculo.");
   }
-  // ----------------------------------------
 
-  // --- 1. LEER Y VALIDAR ENCABEZADOS (Normalizados) ---
   const headerMap = {};
   worksheet.getRow(1).eachCell((cell, colNumber) => {
     headerMap[cleanLower(cell.value)] = colNumber;
@@ -609,7 +599,6 @@ export const importDevicesFromExcel = async (buffer, user) => {
       throw new Error("El archivo no parece ser un inventario válido. Faltan columnas obligatorias como 'Nombre Equipo' o 'N° Serie'.");
   }
 
-  // --- 2. CARGA DE CONTEXTO ---
   const [areas, users, dbTypes, dbStatuses, dbOS] = await Promise.all([
     prisma.area.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport }, include: { departamento: true } }),
     prisma.user.findMany({ where: { deletedAt: null, hotelId: hotelIdToImport } }),
@@ -618,7 +607,6 @@ export const importDevicesFromExcel = async (buffer, user) => {
     prisma.operatingSystem.findMany({ where: { deletedAt: null } })
   ]);
 
-  // Mapas normalizados
   const context = {
     userLoginMap: new Map(users.filter(i => i.usuario_login).map(i => [cleanLower(i.usuario_login), i.id])),
     userNameMap: new Map(users.map(i => [cleanLower(i.nombre), i.id])),
@@ -633,7 +621,7 @@ export const importDevicesFromExcel = async (buffer, user) => {
   };
 
   const devicesToProcess = [];
-  const warnings = []; // Lista para almacenar alertas de usuarios no encontrados
+  const warnings = []; 
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
@@ -643,13 +631,11 @@ export const importDevicesFromExcel = async (buffer, user) => {
 
     const foreignKeys = resolveForeignKeys(rowData, context);
     
-    // --- LÓGICA DE ALERTA DE USUARIOS ---
     const hasUserInfo = rowData.responsableLogin || rowData.responsableName;
     if (hasUserInfo && !foreignKeys.usuarioId) {
         const userValue = rowData.responsableLogin || rowData.responsableName;
-        warnings.push(`Fila ${rowNumber} (${rowData.nombre_equipo || 'Sin Nombre'}): El usuario indicado '${userValue}' no se encontró en el sistema. El equipo se importará sin asignar usuario.`);
+        warnings.push(`Fila ${rowNumber} (${rowData.nombre_equipo || 'Sin Nombre'}): El usuario indicado '${userValue}' no se encontró en el sistema.`);
     }
-    // ------------------------------------
 
     const finalNombre = rowData.nombre_equipo || `Equipo Fila ${rowNumber}`;
     const finalSerie = rowData.serie || `SN-GEN-${rowNumber}-${Date.now().toString().slice(-4)}`;
@@ -660,6 +646,9 @@ export const importDevicesFromExcel = async (buffer, user) => {
         ip_equipo: rowData.ip_equipo, descripcion: rowData.descripcion, comentarios: rowData.comentarios || null, perfiles_usuario: rowData.perfiles || null,
         usuarioId: foreignKeys.usuarioId, areaId: foreignKeys.areaId, office_version: rowData.office_version || null, office_tipo_licencia: rowData.office_licencia || null,
         garantia_numero_producto: rowData.garantia_num_prod || null, garantia_inicio: rowData.garantia_inicio, garantia_fin: rowData.garantia_fin, es_panda: rowData.es_panda,
+        fecha_baja: rowData.fecha_baja || null,
+        motivo_baja: rowData.motivo_baja || null,
+        observaciones_baja: rowData.observaciones_baja || null,
       },
       meta: { tipo: rowData.tipoStr, estado: rowData.estadoStr, os: rowData.osStr }
     });
@@ -668,13 +657,31 @@ export const importDevicesFromExcel = async (buffer, user) => {
   let successCount = 0;
   const errors = [];
 
+  const disposedStatusDB = dbStatuses.find(s => s.nombre === DEVICE_STATUS.DISPOSED);
+  const disposedStatusId = disposedStatusDB ? disposedStatusDB.id : null;
+
   for (const item of devicesToProcess) {
     try {
       const tipoId = await getOrCreateCatalog('deviceType', item.meta.tipo, caches.types);
       const estadoId = await getOrCreateCatalog('deviceStatus', item.meta.estado, caches.status);
       const sistemaOperativoId = await getOrCreateCatalog('operatingSystem', item.meta.os, caches.os);
 
-      const finalData = { ...item.deviceData, tipoId, estadoId, sistemaOperativoId, hotelId: hotelIdToImport };
+      let finalData = { ...item.deviceData, tipoId, estadoId, sistemaOperativoId, hotelId: hotelIdToImport };
+
+      // --- LOGICA DE FECHA DE BAJA ---
+      if (disposedStatusId && estadoId === disposedStatusId) {
+          // Si el estado es "Inactivo", verificamos si trajo fecha manual
+          if (!finalData.fecha_baja) {
+              // Si no trajo, ponemos la fecha actual
+              finalData.fecha_baja = new Date();
+          }
+          // Si sí trajo, la dejamos intacta (ya está en finalData.fecha_baja)
+      } else {
+          // Si NO es inactivo, limpiamos campos de baja
+          finalData.fecha_baja = null;
+          finalData.motivo_baja = null;
+          finalData.observaciones_baja = null;
+      }
 
       const exists = await prisma.device.findFirst({ where: { numero_serie: finalData.numero_serie, hotelId: hotelIdToImport } });
 
