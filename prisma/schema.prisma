@@ -13,6 +13,8 @@ model Hotel {
   codigo      String    @unique 
   direccion   String?
   ciudad      String?   // Campo nuevo para el formato de resguardo
+  razonSocial String?   
+  diminutivo  String?
   logoUrl     String?
   activo      Boolean   @default(true)
   

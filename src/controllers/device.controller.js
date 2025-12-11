@@ -2,7 +2,7 @@ import * as deviceService from "../services/device.service.js";
 import ExcelJS from "exceljs";
 import prisma from "../PrismaClient.js";
 import { DEVICE_STATUS } from "../config/constants.js"; 
-// Nuevos imports para docxtemplater
+// Imports para docxtemplater (Resguardos)
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import fs from "fs";
@@ -46,7 +46,6 @@ export const getDevices = async (req, res, next) => {
 
 export const getAllActiveDeviceNames = async (req, res, next) => {
     try {
-
       const devices = await deviceService.getAllActiveDeviceNames(req.user);
       res.json(devices); 
     } catch (error) {
@@ -56,7 +55,6 @@ export const getAllActiveDeviceNames = async (req, res, next) => {
   
 export const getDevice = async (req, res, next) => {
     try {
-
         const device = await deviceService.getDeviceById(req.params.id, req.user);
         if (!device) return res.status(404).json({ error: "Dispositivo no encontrado o no tienes acceso a este hotel." });
         res.json(device);
@@ -67,7 +65,6 @@ export const getDevice = async (req, res, next) => {
 
 export const getPandaStatus = async (req, res, next) => {
     try {
-
         const counts = await deviceService.getPandaStatusCounts(req.user);
         res.json(counts);
     } catch (error) {
@@ -77,7 +74,6 @@ export const getPandaStatus = async (req, res, next) => {
 
 export const getDashboardData = async (req, res, next) => {
     try {
-
         const stats = await deviceService.getDashboardStats(req.user);
         res.json(stats);
     } catch (error) {
@@ -111,7 +107,6 @@ export const createDevice = async (req, res, next) => {
       const newDevice = await deviceService.createDevice(dataToCreate, req.user);
       
       if (fecha_proxima_revision) {
-
         await prisma.maintenance.create({
           data: {
             descripcion: "Revisión preventiva inicial",
@@ -172,7 +167,6 @@ export const deleteDevice = async (req, res, next) => {
 
 export const exportInactiveDevices = async (req, res, next) => {
     try {
-      // Capturamos fechas opcionales del query params
       const { startDate, endDate } = req.query;
 
       const { devices } = await deviceService.getInactiveDevices({ 
@@ -200,7 +194,7 @@ export const exportInactiveDevices = async (req, res, next) => {
         { header: "Departamento", key: "departamento", width: 25 }, 
         { header: "Motivo", key: "motivo_baja", width: 30 },
         { header: "Observaciones", key: "observaciones_baja", width: 40 },
-        { header: "Fecha Baja", key: "fecha_baja", width: 15 }, // Agregado para referencia
+        { header: "Fecha Baja", key: "fecha_baja", width: 15 }, 
       ];
       
       devices.forEach((device, index) => {
@@ -236,7 +230,19 @@ export const exportInactiveDevices = async (req, res, next) => {
 
 export const exportAllDevices = async (req, res, next) => {
     try {
-      const { devices } = await deviceService.getActiveDevices({ skip: 0, take: undefined }, req.user);
+      const { types } = req.query; 
+      let typeIds = undefined;
+
+      if (types) {
+          typeIds = types.split(',').map(id => Number(id)).filter(n => !isNaN(n));
+      }
+
+      const { devices } = await deviceService.getActiveDevices({ 
+          skip: 0, 
+          take: undefined,
+          typeIds 
+      }, req.user);
+
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Inventario Activo");
 
@@ -373,9 +379,17 @@ export const exportCorrectiveAnalysis = async (req, res, next) => {
 export const exportResguardo = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { userId } = req.query; // Capturar usuario opcional
+        const { userId } = req.query; 
         
-        const device = await deviceService.getDeviceById(id, req.user);
+        // Obtenemos dispositivo y su hotel relacionado
+        const device = await prisma.device.findUnique({
+            where: { id: Number(id) },
+            include: { 
+                usuario: true, 
+                tipo: true, 
+                hotel: true // Importante: incluir el hotel
+            }
+        });
 
         if (!device) {
             return res.status(404).json({ error: "Dispositivo no encontrado o acceso denegado." });
@@ -383,11 +397,9 @@ export const exportResguardo = async (req, res, next) => {
 
         let assignedUserName = "______________________";
         
-        // Prioridad 1: Si el dispositivo ya tiene usuario, usamos ese.
         if (device.usuario) {
             assignedUserName = device.usuario.nombre.toUpperCase();
         } 
-        // Prioridad 2: Si no tiene, y se envió un userId, usamos ese.
         else if (userId) {
             const selectedUser = await prisma.user.findUnique({
                 where: { id: Number(userId) }
@@ -417,18 +429,15 @@ export const exportResguardo = async (req, res, next) => {
 
         const tipoEquipo = device.tipo?.nombre ? device.tipo.nombre.toUpperCase() : "EQUIPO";
         
-        // CORRECCIÓN: Lógica dinámica de ubicación
-        // Se elimina "Cancún, Quintana Roo" como hardcode.
-        let ubicacion = "LUGAR_NO_DEFINIDO"; 
+        // --- LOGICA DE VARIABLES DEL HOTEL ---
+        const razonSocial = device.hotel?.razonSocial || "HOTELERA CANCO S.A. DE C.V.";
+        const diminutivo = device.hotel?.diminutivo || "CANCO";
         
-        if (device.hotel) {
-            if (device.hotel.ciudad) {
-                ubicacion = device.hotel.ciudad;
-            } else if (device.hotel.direccion) {
-                ubicacion = device.hotel.direccion; 
-            } else {
-                ubicacion = device.hotel.nombre; // Fallback al nombre del hotel
-            }
+        let ubicacion = "Cancún, Quintana Roo";
+        if (device.hotel?.ciudad) {
+            ubicacion = device.hotel.ciudad;
+        } else if (device.hotel?.direccion) {
+            ubicacion = device.hotel.direccion;
         }
 
         const data = {
@@ -443,6 +452,14 @@ export const exportResguardo = async (req, res, next) => {
             color: "NA", 
             serie: device.numero_serie || "S/N",
             nombre_empleado: assignedUserName,
+
+            // Variables para la plantilla
+            razonSocial: razonSocial,
+            diminutivo: diminutivo,
+            
+            // Compatibilidad
+            razon_social: razonSocial,
+            empresa_corto: diminutivo
         };
 
         doc.render(data);
@@ -460,13 +477,10 @@ export const exportResguardo = async (req, res, next) => {
 
     } catch (error) {
         console.error("Error generando resguardo:", error);
-        
         if (error.properties && error.properties.errors) {
             const errorMessages = error.properties.errors.map(e => e.message).join(", ");
-            console.error("Detalle error plantilla:", errorMessages);
             return res.status(400).json({ error: `Error en la plantilla Word: ${errorMessages}` });
         }
-        
         next(error);
     }
 };

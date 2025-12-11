@@ -8,7 +8,8 @@ const getTenantFilter = (user) => {
   return { hotelId: user.hotelId };
 };
 
-export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order }, user) => {
+// MODIFICADO: Se añade 'typeIds' a los argumentos desestructurados
+export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order, typeIds }, user) => {
   const tenantFilter = getTenantFilter(user);
 
   const disposedStatus = await prisma.deviceStatus.findFirst({
@@ -26,6 +27,12 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
   } else {
     whereClause.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
   }
+
+  // --- NUEVA LÓGICA DE FILTRADO POR TIPOS MÚLTIPLES ---
+  if (typeIds && Array.isArray(typeIds) && typeIds.length > 0) {
+      whereClause.tipoId = { in: typeIds };
+  }
+  // ----------------------------------------------------
 
   if (search) {
     whereClause.AND = whereClause.AND || [];
@@ -103,6 +110,7 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
   return { devices, totalCount };
 };
 
+// ... (El resto de funciones createDevice, updateDevice, etc. se mantienen igual)
 export const createDevice = async (data, user) => {
   let hotelIdToAssign = user.hotelId;
 
@@ -259,7 +267,7 @@ export const getAllActiveDeviceNames = async (user) => {
       nombre_equipo: true,
       tipo: { select: { nombre: true } },
       hotelId: true,
-      usuario: { select: { id: true, nombre: true } } // Agregado para validación en frontend
+      usuario: { select: { id: true, nombre: true } } 
     },
     orderBy: { etiqueta: 'asc' }
   });
@@ -414,7 +422,8 @@ export const getDashboardStats = async (user) => {
     riskWarranty,
     currentMonthDisposals,
     totalStaff,
-    warrantyAlerts
+    warrantyAlerts,
+    devicesByTypeRaw // NUEVO
   ] = await prisma.$transaction([
     prisma.device.count({ where: activeFilter }),
     prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
@@ -442,8 +451,26 @@ export const getDashboardStats = async (user) => {
         garantia_fin: true
       },
       orderBy: { garantia_fin: 'asc' }
+    }),
+    // NUEVO: Agrupación por tipo
+    prisma.device.groupBy({
+        by: ['tipoId'],
+        where: activeFilter,
+        _count: { tipoId: true }
     })
   ]);
+
+  // Enriquecer los tipos con sus nombres
+  const typeIds = devicesByTypeRaw.map(d => d.tipoId);
+  const types = await prisma.deviceType.findMany({ where: { id: { in: typeIds } } });
+  
+  const devicesByType = devicesByTypeRaw.map(item => {
+      const typeInfo = types.find(t => t.id === item.tipoId);
+      return {
+          name: typeInfo ? typeInfo.nombre : "Desconocido",
+          value: item._count.tipoId
+      };
+  }).sort((a, b) => b.value - a.value);
 
   const withoutPanda = totalActive - withPanda;
   const safeWarranty = totalActive - expiredWarranty - riskWarranty;
@@ -461,10 +488,13 @@ export const getDashboardStats = async (user) => {
       risk: riskWarranty,
       safe: safeWarranty
     },
-    warrantyAlertsList: warrantyAlerts
+    warrantyAlertsList: warrantyAlerts,
+    devicesByType // NUEVO
   };
 };
 
+// ... (Resto de funciones de importación/exportación se mantienen igual, el código se cortaría aquí)
+// Asegúrate de mantener importDevicesFromExcel y getExpiredWarrantyAnalysis sin cambios si no los modificaste.
 const clean = (txt) => txt ? txt.toString().trim() : "";
 const cleanLower = (txt) => {
     if (!txt) return "";
