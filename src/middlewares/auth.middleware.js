@@ -3,7 +3,12 @@ import prisma from "../PrismaClient.js";
 import * as auditService from "../services/audit.service.js";
 import { ROLES } from "../config/constants.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  process.exit(1);
+}
+
 export const verifyToken = async (req, res, next) => {
   let token = null;
 
@@ -62,7 +67,6 @@ export const verifyToken = async (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error("Error Token:", error.message);
     return res.status(401).json({ error: "Token inválido o expirado" });
   }
 };

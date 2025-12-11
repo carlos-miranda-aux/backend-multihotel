@@ -3,12 +3,16 @@ import cors from "cors";
 import dotenv from "dotenv";
 import prisma from "./PrismaClient.js";
 import cron from "node-cron"; 
+import helmet from "helmet"; 
+import rateLimit from "express-rate-limit"; 
+import compression from "compression"; 
+import morgan from "morgan"; 
+
 import { sendMaintenanceReminder } from "./utils/email.service.js"; 
 import { preloadMasterData } from "./utils/preloadData.js";
-
 import { MAINTENANCE_STATUS } from "./config/constants.js"; 
 
-// Importar rutas
+// Rutas
 import departmentRoutes from "./routes/department.routes.js";
 import areaRoutes from "./routes/area.routes.js"; 
 import osRoutes from "./routes/operatingSystem.routes.js";
@@ -27,10 +31,47 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// --- CONFIGURACIÓN DE SEGURIDAD Y MIDDLEWARES ---
+
+// 1. Logs de peticiones
+app.use(morgan("combined")); 
+
+// 2. Cabeceras de seguridad HTTP
+app.use(helmet());
+
+// 3. Compresión Gzip
+app.use(compression());
+
+// 4. Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 300, // Límite de peticiones por IP
+  message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde."
+});
+app.use(limiter);
+
+// 5. Configuración CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('Bloqueado por CORS'), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
-// rutas
+// --- RUTAS ---
 app.use("/api/departments", departmentRoutes);
 app.use("/api/areas", areaRoutes); 
 app.use("/api/operating-systems", osRoutes);
@@ -46,21 +87,20 @@ app.use("/api/hotels", hotelRoutes);
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT
 
 app.listen(PORT, async () => {
-  //console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor seguro corriendo en el puerto ${PORT}`);
 
   try {
     await prisma.$connect();
-
+    // Carga datos iniciales si la BD está vacía
     await preloadMasterData();
-
   } catch (err) {
-    console.error(err);
+    console.error("Error al iniciar DB:", err);
   }
 
-  //cron.schedule('* * * * *', async () => {
+  // --- CRON JOBS ---
   cron.schedule('0 9 * * *', async () => {
     try {
       const today = new Date();
@@ -92,34 +132,36 @@ app.listen(PORT, async () => {
         }
       });
 
-      if (maintenances.length === 0) return;
-
-      for (const maint of maintenances) {
-        const device = maint.device;
-        if (!device || !device.areaId) continue;
-
-        const manager = await prisma.user.findFirst({
-          where: {
-            areaId: device.areaId,
-            es_jefe_de_area: true,
-            deletedAt: null 
+      if (maintenances.length > 0) {
+        console.log(`Se encontraron ${maintenances.length} mantenimientos proximos. Enviando correos...`);
+        for (const maint of maintenances) {
+            const device = maint.device;
+            if (!device || !device.areaId) continue;
+    
+            const manager = await prisma.user.findFirst({
+              where: {
+                areaId: device.areaId,
+                es_jefe_de_area: true,
+                deletedAt: null 
+              }
+            });
+    
+            if (manager && manager.correo) {
+              const maintDate = new Date(maint.fecha_programada);
+              maintDate.setHours(0, 0, 0, 0);
+    
+              if (maintDate.getTime() === fiveDaysFromNow.getTime()) {
+                await sendMaintenanceReminder(maint, manager, 5);
+              } else if (maintDate.getTime() === oneDayFromNow.getTime()) {
+                await sendMaintenanceReminder(maint, manager, 1);
+              }
+            }
           }
-        });
-
-        if (manager && manager.correo) {
-          const maintDate = new Date(maint.fecha_programada);
-          maintDate.setHours(0, 0, 0, 0);
-
-          if (maintDate.getTime() === fiveDaysFromNow.getTime()) {
-            await sendMaintenanceReminder(maint, manager, 5);
-          } else if (maintDate.getTime() === oneDayFromNow.getTime()) {
-            await sendMaintenanceReminder(maint, manager, 1);
-          }
-        }
+      } else {
       }
 
     } catch (cronError) {
-      console.error("Error CRON:", cronError);
+      console.error("Error en CRON:", cronError);
     }
   }, {
     scheduled: true,
