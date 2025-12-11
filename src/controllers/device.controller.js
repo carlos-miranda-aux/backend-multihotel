@@ -373,11 +373,28 @@ export const exportCorrectiveAnalysis = async (req, res, next) => {
 export const exportResguardo = async (req, res, next) => {
     try {
         const { id } = req.params;
+        const { userId } = req.query; // Capturar usuario opcional
         
         const device = await deviceService.getDeviceById(id, req.user);
 
         if (!device) {
             return res.status(404).json({ error: "Dispositivo no encontrado o acceso denegado." });
+        }
+
+        let assignedUserName = "______________________";
+        
+        // Prioridad 1: Si el dispositivo ya tiene usuario, usamos ese.
+        if (device.usuario) {
+            assignedUserName = device.usuario.nombre.toUpperCase();
+        } 
+        // Prioridad 2: Si no tiene, y se envió un userId, usamos ese.
+        else if (userId) {
+            const selectedUser = await prisma.user.findUnique({
+                where: { id: Number(userId) }
+            });
+            if (selectedUser) {
+                assignedUserName = selectedUser.nombre.toUpperCase();
+            }
         }
 
         const templatePath = path.resolve(__dirname, "../templates/resguardo_template.docx");
@@ -400,7 +417,7 @@ export const exportResguardo = async (req, res, next) => {
 
         const tipoEquipo = device.tipo?.nombre ? device.tipo.nombre.toUpperCase() : "EQUIPO";
         
-        // Logica para obtener la ciudad desde el hotel, con fallback a direccion o texto default
+        // Logica para obtener la ciudad desde el hotel
         let ubicacion = "Cancún, Quintana Roo"; 
         if (device.hotel) {
             if (device.hotel.ciudad) {
@@ -421,7 +438,7 @@ export const exportResguardo = async (req, res, next) => {
             modelo: device.modelo || "GENÉRICO",
             color: "NA", 
             serie: device.numero_serie || "S/N",
-            nombre_empleado: device.usuario ? device.usuario.nombre.toUpperCase() : "______________________",
+            nombre_empleado: assignedUserName,
         };
 
         doc.render(data);
