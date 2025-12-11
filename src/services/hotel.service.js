@@ -4,8 +4,12 @@ import * as auditService from "./audit.service.js";
 export const getAllHotels = async () => {
   return prisma.hotel.findMany({
     where: { deletedAt: null },
-    // Se agrega 'ciudad' a la seleccion
-    select: { id: true, nombre: true, codigo: true, direccion: true, ciudad: true, activo: true },
+    // Se agregan los nuevos campos a la selección
+    select: { 
+        id: true, nombre: true, codigo: true, direccion: true, 
+        ciudad: true, razonSocial: true, diminutivo: true, 
+        activo: true 
+    },
     orderBy: { nombre: 'asc' }
   });
 };
@@ -16,7 +20,9 @@ export const createHotel = async (data, user) => {
       nombre: data.nombre,
       codigo: data.codigo,
       direccion: data.direccion,
-      ciudad: data.ciudad, // Se agrega campo ciudad
+      ciudad: data.ciudad,
+      razonSocial: data.razonSocial, // Nuevo
+      diminutivo: data.diminutivo,   // Nuevo
       activo: data.activo !== undefined ? data.activo : true
     }
   });
@@ -43,7 +49,9 @@ export const updateHotel = async (id, data, user) => {
       nombre: data.nombre,
       codigo: data.codigo,
       direccion: data.direccion,
-      ciudad: data.ciudad, // Se agrega campo ciudad
+      ciudad: data.ciudad,
+      razonSocial: data.razonSocial, // Nuevo
+      diminutivo: data.diminutivo,   // Nuevo
       activo: data.activo
     }
   });
