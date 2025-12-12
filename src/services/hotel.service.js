@@ -1,10 +1,32 @@
 import prisma from "../PrismaClient.js";
 import * as auditService from "./audit.service.js";
 import { STANDARD_STRUCTURE_TEMPLATE } from "../utils/preloadData.js";
+import { ROLES } from "../config/constants.js";
 
-export const getAllHotels = async () => {
+// Filtro especial para la entidad Hotel (filtra por ID, no por hotelId)
+const getHotelFilter = (user) => {
+    if (!user) return { id: -1 }; 
+
+    if (user.rol === ROLES.ROOT || user.rol === ROLES.CORP_VIEWER) {
+        return {};
+    }
+
+    if (user.hotels && user.hotels.length > 0) {
+        const myHotelIds = user.hotels.map(h => h.id);
+        return { id: { in: myHotelIds } };
+    }
+
+    return { id: -1 };
+};
+
+export const getAllHotels = async (user) => {
+  const filter = getHotelFilter(user);
+
   return prisma.hotel.findMany({
-    where: { deletedAt: null },
+    where: { 
+        deletedAt: null,
+        ...filter
+    },
     select: { 
         id: true, nombre: true, codigo: true, direccion: true, 
         ciudad: true, razonSocial: true, diminutivo: true, 
@@ -28,38 +50,26 @@ export const createHotel = async (data, user) => {
     }
   });
 
-  // 2. Generar Estructura Automática (Si se solicita)
+  // 2. Generar Estructura Automática
   if (data.autoStructure) {
       
       for (const group of STANDARD_STRUCTURE_TEMPLATE) {
-          // A. Crear el Departamento vinculado al Hotel
-          // Usamos upsert por seguridad si por alguna razón extraña ya existiera
           const depto = await prisma.department.upsert({
               where: { 
-                  nombre_hotelId: { 
-                      nombre: group.depto, 
-                      hotelId: newHotel.id 
-                  }
+                  nombre_hotelId: { nombre: group.depto, hotelId: newHotel.id }
               },
               update: {},
-              create: {
-                  nombre: group.depto,
-                  hotelId: newHotel.id
-              }
+              create: { nombre: group.depto, hotelId: newHotel.id }
           });
 
-          // B. Crear las Áreas vinculadas
           if (group.areas && group.areas.length > 0) {
-              // FILTRO DE SEGURIDAD: Elimina nombres duplicados en el array antes de procesar
               const uniqueAreas = [...new Set(group.areas)];
-
               const areasData = uniqueAreas.map(areaName => ({
                   nombre: areaName,
                   departamentoId: depto.id,
                   hotelId: newHotel.id
               }));
 
-              // createMany con skipDuplicates evita el error P2002 si algo se repite
               await prisma.area.createMany({
                   data: areasData,
                   skipDuplicates: true 
@@ -68,14 +78,13 @@ export const createHotel = async (data, user) => {
       }
   }
 
-  // 3. Registrar Auditoría
   await auditService.logActivity({
     action: 'CREATE',
     entity: 'Hotel',
     entityId: newHotel.id,
     newData: newHotel,
     user: user,
-    details: `Nuevo Hotel creado: ${newHotel.nombre} ${data.autoStructure ? '(Con estructura base)' : ''}`
+    details: `Nuevo Hotel creado: ${newHotel.nombre}`
   });
 
   return newHotel;
@@ -83,6 +92,12 @@ export const createHotel = async (data, user) => {
 
 export const updateHotel = async (id, data, user) => {
   const hotelId = Number(id);
+  
+  if (user.rol !== ROLES.ROOT) {
+      const hasAccess = user.hotels?.some(h => h.id === hotelId);
+      if (!hasAccess) throw new Error("No tienes permiso para editar este hotel.");
+  }
+
   const oldHotel = await prisma.hotel.findUnique({ where: { id: hotelId } });
 
   const updatedHotel = await prisma.hotel.update({
@@ -112,8 +127,11 @@ export const updateHotel = async (id, data, user) => {
 };
 
 export const deleteHotel = async (id, user) => {
+  if (user.rol !== ROLES.ROOT) {
+      throw new Error("Solo el Super Admin (Root) puede eliminar hoteles.");
+  }
+
   const hotelId = Number(id);
-  
   const oldHotel = await prisma.hotel.findUnique({ where: { id: hotelId } });
 
   const deleted = await prisma.hotel.update({

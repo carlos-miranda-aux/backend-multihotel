@@ -9,27 +9,27 @@ datasource db {
 
 model Hotel {
   id          Int       @id @default(autoincrement())
-  nombre      String    @unique 
-  codigo      String    @unique 
+  nombre      String    @unique
+  codigo      String    @unique
   direccion   String?
   ciudad      String?   // Campo nuevo para el formato de resguardo
-  razonSocial String?   
+  razonSocial String?
   diminutivo  String?
   logoUrl     String?
   activo      Boolean   @default(true)
-  
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   // Relaciones
-  users       UserSistema[] 
-  
-  staff       User[]        
+  users       UserSistema[]
+  staff       User[]
   departments Department[]
   devices     Device[]
   areas       Area[]
   maintenances Maintenance[]
+  auditLogs   AuditLog[] // Relacion inversa agregada para correccion de error
 }
 
 enum Rol {
@@ -52,6 +52,7 @@ model UserSistema {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  
   auditLogs AuditLog[]
 }
 
@@ -62,7 +63,8 @@ model Department {
   hotelId   Int
   deletedAt DateTime?
   areas     Area[]
-  @@unique([nombre, hotelId]) 
+
+  @@unique([nombre, hotelId])
 }
 
 model Area {
@@ -73,8 +75,9 @@ model Area {
   departamento   Department @relation(fields: [departamentoId], references: [id])
   departamentoId Int
   deletedAt      DateTime?
-  users          User[]     
+  users          User[]
   devices        Device[]
+
   @@unique([nombre, departamentoId, hotelId])
 }
 
@@ -99,7 +102,7 @@ model DeviceStatus {
   devices   Device[]
 }
 
-model User { 
+model User {
   id              Int       @id @default(autoincrement())
   nombre          String
   correo          String?
@@ -112,6 +115,7 @@ model User {
   created_at      DateTime  @default(now())
   deletedAt       DateTime?
   devices         Device[]
+
   @@index([areaId])
   @@index([hotelId])
 }
@@ -120,7 +124,7 @@ model Device {
   id                       Int       @id @default(autoincrement())
   hotel                    Hotel     @relation(fields: [hotelId], references: [id])
   hotelId                  Int
-  
+
   etiqueta                 String?
   nombre_equipo            String
   descripcion              String?
@@ -135,7 +139,7 @@ model Device {
   tipoId                   Int
   marca                    String
   modelo                   String
-  numero_serie             String    
+  numero_serie             String
   estado                   DeviceStatus @relation(fields: [estadoId], references: [id])
   estadoId                 Int
   sistema_operativo        OperatingSystem? @relation(fields: [sistemaOperativoId], references: [id])
@@ -159,9 +163,10 @@ model Device {
   updated_at               DateTime  @updatedAt
   deletedAt                DateTime?
   maintenances             Maintenance[]
+
   @@index([hotelId])
   @@index([usuarioId])
-  @@unique([numero_serie, hotelId]) 
+  @@unique([numero_serie, hotelId])
 }
 
 model Maintenance {
@@ -170,7 +175,7 @@ model Maintenance {
   fecha_programada    DateTime
   fecha_realizacion   DateTime?
   estado              String    @default("pendiente")
-  tipo_mantenimiento  String    @default("Preventivo") 
+  tipo_mantenimiento  String    @default("Preventivo")
   diagnostico         String?   @db.Text
   acciones_realizadas String?   @db.Text
   observaciones       String?   @db.Text
@@ -179,24 +184,29 @@ model Maintenance {
   hotel               Hotel     @relation(fields: [hotelId], references: [id])
   hotelId             Int
   deletedAt           DateTime?
+
   @@index([deviceId])
   @@index([hotelId])
 }
 
 model AuditLog {
   id          Int          @id @default(autoincrement())
-  action      String       
-  entity      String       
-  entityId    Int        
+  action      String
+  entity      String
+  entityId    Int
   oldData     Json?
   newData     Json?
   details     String?
-  ipAddress   String?      
+  ipAddress   String?
   userAgent   String?
   createdAt   DateTime     @default(now())
+  
   userId      Int?
   user        UserSistema? @relation(fields: [userId], references: [id])
+  
   hotelId     Int?
-  @@index([userId])           
-  @@index([hotelId])        
+  hotel       Hotel?       @relation(fields: [hotelId], references: [id]) // Relacion corregida
+
+  @@index([userId])
+  @@index([hotelId])
 }
