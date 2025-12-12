@@ -1,5 +1,5 @@
 import prisma from "../PrismaClient.js";
-import { ROLES } from "../config/constants.js"; // 👈 IMPORTANTE
+import { ROLES } from "../config/constants.js"; // 👈 Asegúrate de que existe esta constante
 
 export const logActivity = async ({
   action,
@@ -49,7 +49,7 @@ export const logActivity = async ({
 export const getAuditLogs = async ({ skip, take, entity, userId, hotelId }, user) => {
   const where = {};
 
-  // --- FILTRO DE SEGURIDAD CORREGIDO ---
+  // --- FILTRO DE SEGURIDAD MULTI-TENANT ---
   if (user.hotelId) {
       // 1. Si el usuario tiene contexto activo (Hotel seleccionado)
       where.hotelId = user.hotelId;
@@ -95,6 +95,9 @@ export const getAuditLogs = async ({ skip, take, entity, userId, hotelId }, user
         user: {
           select: { username: true, nombre: true, rol: true }
         },
+        hotel: {
+            select: { nombre: true, codigo: true }
+        }
       }
     }),
     prisma.auditLog.count({ where })

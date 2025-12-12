@@ -1,5 +1,5 @@
 import prisma from "../../src/PrismaClient.js";
-import * as auditService from "./audit.service.js"; 
+import * as auditService from "./audit.service.js";
 import { ROLES } from "../config/constants.js"; // 👈 IMPORTANTE
 
 // --- CORRECCIÓN DE SEGURIDAD MULTI-TENANT ---
@@ -94,17 +94,17 @@ export const getMaintenanceById = (id, user) => {
   });
 };
 
-// ... (El resto de funciones create, update, delete se mantienen igual, ya usan las validaciones)
 export const createMaintenance = async (data, user) => {
   const device = await prisma.device.findUnique({ where: { id: Number(data.deviceId) } });
   if (!device) throw new Error("Dispositivo no encontrado.");
 
-  // Validación de seguridad cruzada
+  // Validación de seguridad para crear:
+  // Si el usuario tiene contexto de hotel, debe coincidir.
+  // Si no tiene contexto (Global), debe tener permiso sobre ese hotel.
   if (user.hotelId && device.hotelId !== user.hotelId) {
       throw new Error("No puedes programar mantenimiento para un equipo que no pertenece a tu hotel activo.");
   }
   
-  // Validación para vista global limitada
   if (!user.hotelId && user.hotels && user.hotels.length > 0) {
       const hasAccess = user.hotels.some(h => h.id === device.hotelId);
       if (!hasAccess && user.rol !== ROLES.ROOT) {

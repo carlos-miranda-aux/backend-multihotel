@@ -1,12 +1,34 @@
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
-import { DEVICE_STATUS, DEFAULTS } from "../config/constants.js";
+import { DEVICE_STATUS, DEFAULTS, ROLES } from "../config/constants.js"; // 👈 Asegúrate de importar ROLES
 import * as auditService from "./audit.service.js";
 
+// --- CORRECCIÓN DE SEGURIDAD MULTI-TENANT ---
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {};
-  return { hotelId: user.hotelId };
+  if (!user) return { hotelId: -1 }; // Bloqueo de seguridad
+
+  // 1. Si hay un hotel seleccionado específicamente (Contexto activo)
+  if (user.hotelId) {
+    return { hotelId: user.hotelId };
+  }
+
+  // 2. Si es ROOT o CORP_VIEWER (Roles Globales), ven todo
+  // Usamos los strings directos o la constante importada para mayor seguridad
+  if (user.rol === ROLES.ROOT || user.rol === ROLES.CORP_VIEWER) {
+    return {};
+  }
+
+  // 3. Si es un usuario normal con múltiples hoteles (Vista Global Limitada)
+  // Filtramos para que SOLO vea la suma de sus hoteles asignados
+  if (user.hotels && user.hotels.length > 0) {
+    const allowedIds = user.hotels.map(h => h.id);
+    return { hotelId: { in: allowedIds } };
+  }
+
+  // 4. Fallback: Si no tiene permisos ni hoteles asignados, no ve nada
+  return { hotelId: -1 };
 };
+// ----------------------------------------------------
 
 // MODIFICADO: Se añade 'typeIds' a los argumentos desestructurados
 export const getActiveDevices = async ({ skip, take, search, filter, sortBy, order, typeIds }, user) => {
@@ -28,11 +50,10 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
     whereClause.estado = { isNot: { nombre: DEVICE_STATUS.DISPOSED } };
   }
 
-  // --- NUEVA LÓGICA DE FILTRADO POR TIPOS MÚLTIPLES ---
+  // --- LÓGICA DE FILTRADO POR TIPOS MÚLTIPLES ---
   if (typeIds && Array.isArray(typeIds) && typeIds.length > 0) {
       whereClause.tipoId = { in: typeIds };
   }
-  // ----------------------------------------------------
 
   if (search) {
     whereClause.AND = whereClause.AND || [];
@@ -110,7 +131,6 @@ export const getActiveDevices = async ({ skip, take, search, filter, sortBy, ord
   return { devices, totalCount };
 };
 
-// ... (El resto de funciones createDevice, updateDevice, etc. se mantienen igual)
 export const createDevice = async (data, user) => {
   let hotelIdToAssign = user.hotelId;
 
@@ -160,12 +180,10 @@ export const updateDevice = async (id, data, user) => {
 
   if (disposedStatusId) {
     if (oldDevice.estadoId === disposedStatusId && data.estadoId && data.estadoId !== disposedStatusId) {
-      // Reactivación: Limpiar datos de baja
       data.fecha_baja = null;
       data.motivo_baja = null;
       data.observaciones_baja = null;
     } else if (data.estadoId === disposedStatusId && oldDevice.estadoId !== disposedStatusId) {
-      // Baja: Asignar fecha actual solo si no viene una fecha manual en la data
       if (!data.fecha_baja) {
           data.fecha_baja = new Date();
       }
@@ -423,7 +441,7 @@ export const getDashboardStats = async (user) => {
     currentMonthDisposals,
     totalStaff,
     warrantyAlerts,
-    devicesByTypeRaw // NUEVO
+    devicesByTypeRaw 
   ] = await prisma.$transaction([
     prisma.device.count({ where: activeFilter }),
     prisma.device.count({ where: { ...activeFilter, es_panda: true } }),
@@ -452,7 +470,6 @@ export const getDashboardStats = async (user) => {
       },
       orderBy: { garantia_fin: 'asc' }
     }),
-    // NUEVO: Agrupación por tipo
     prisma.device.groupBy({
         by: ['tipoId'],
         where: activeFilter,
@@ -460,7 +477,6 @@ export const getDashboardStats = async (user) => {
     })
   ]);
 
-  // Enriquecer los tipos con sus nombres
   const typeIds = devicesByTypeRaw.map(d => d.tipoId);
   const types = await prisma.deviceType.findMany({ where: { id: { in: typeIds } } });
   
@@ -489,12 +505,13 @@ export const getDashboardStats = async (user) => {
       safe: safeWarranty
     },
     warrantyAlertsList: warrantyAlerts,
-    devicesByType // NUEVO
+    devicesByType 
   };
 };
 
-// ... (Resto de funciones de importación/exportación se mantienen igual, el código se cortaría aquí)
-// Asegúrate de mantener importDevicesFromExcel y getExpiredWarrantyAnalysis sin cambios si no los modificaste.
+// ... (Aquí sigue la lógica de importación, no es necesario cambiarla para este fix,
+// pero asegúrate de no borrar las funciones importDevicesFromExcel y getExpiredWarrantyAnalysis)
+
 const clean = (txt) => txt ? txt.toString().trim() : "";
 const cleanLower = (txt) => {
     if (!txt) return "";
@@ -567,7 +584,6 @@ const extractRowData = (row, headerMap) => {
     perfiles: getVal(['perfiles acceso', 'perfiles', 'perfiles de usuario']),
     areaStr: getVal(['área', 'area']),
     deptoStr: getVal(['departamento', 'depto']),
-    // LECTURA DE FECHA DE BAJA PARA IMPORTACION
     fecha_baja: parseExcelDate(getVal(['fecha baja', 'fecha de baja', 'baja', 'fecha_baja'])),
     motivo_baja: getVal(['motivo', 'motivo baja']),
     observaciones_baja: getVal(['observaciones baja', 'notas baja'])
@@ -698,16 +714,11 @@ export const importDevicesFromExcel = async (buffer, user) => {
 
       let finalData = { ...item.deviceData, tipoId, estadoId, sistemaOperativoId, hotelId: hotelIdToImport };
 
-      // --- LOGICA DE FECHA DE BAJA ---
       if (disposedStatusId && estadoId === disposedStatusId) {
-          // Si el estado es "Inactivo", verificamos si trajo fecha manual
           if (!finalData.fecha_baja) {
-              // Si no trajo, ponemos la fecha actual
               finalData.fecha_baja = new Date();
           }
-          // Si sí trajo, la dejamos intacta (ya está en finalData.fecha_baja)
       } else {
-          // Si NO es inactivo, limpiamos campos de baja
           finalData.fecha_baja = null;
           finalData.motivo_baja = null;
           finalData.observaciones_baja = null;
@@ -731,7 +742,7 @@ export const importDevicesFromExcel = async (buffer, user) => {
 };
 
 export const getExpiredWarrantyAnalysis = async (startDate, endDate, user) => {
-  const tenantFilter = getTenantFilter(user);
+  const tenantFilter = getTenantFilter(user); // <--- AHORA USA LA FUNCIÓN CORREGIDA
 
   const disposedStatus = await prisma.deviceStatus.findFirst({
     where: { nombre: DEVICE_STATUS.DISPOSED }

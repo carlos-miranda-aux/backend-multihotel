@@ -1,10 +1,27 @@
 import prisma from "../../src/PrismaClient.js";
 import * as auditService from "./audit.service.js"; 
+import { ROLES } from "../config/constants.js"; // 👈 IMPORTANTE
 
+// --- CORRECCIÓN DE SEGURIDAD MULTI-TENANT ---
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; 
-  return { hotelId: user.hotelId };
+  if (!user) return { hotelId: -1 };
+
+  if (user.hotelId) {
+    return { hotelId: user.hotelId };
+  }
+
+  if (user.rol === ROLES.ROOT || user.rol === ROLES.CORP_VIEWER) {
+    return {};
+  }
+
+  if (user.hotels && user.hotels.length > 0) {
+    const allowedIds = user.hotels.map(h => h.id);
+    return { hotelId: { in: allowedIds } };
+  }
+
+  return { hotelId: -1 };
 };
+// ----------------------------------------------------
 
 export const getAreas = async ({ skip, take, sortBy, order }, user) => {
   let orderBy = { nombre: 'asc' };
@@ -23,7 +40,7 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
 
   const whereClause = { 
       deletedAt: null,
-      ...tenantFilter
+      ...tenantFilter // 👈 Filtro
   };
 
   const [areas, totalCount] = await prisma.$transaction([
@@ -31,7 +48,7 @@ export const getAreas = async ({ skip, take, sortBy, order }, user) => {
       where: whereClause,
       include: { 
           departamento: true,
-          hotel: { select: { nombre: true, id: true } } 
+          hotel: { select: { nombre: true, id: true, codigo: true } } 
       },
       skip: skip,
       take: take,
@@ -63,6 +80,13 @@ export const getAreaById = (id, user) => {
 export const createArea = async (data, user) => {
     let hotelIdToAssign = user.hotelId;
     if (!hotelIdToAssign && data.hotelId) hotelIdToAssign = Number(data.hotelId);
+    
+    // Validación de permisos
+    if (user.rol !== ROLES.ROOT && user.hotels) {
+        const canCreate = user.hotels.some(h => h.id === hotelIdToAssign);
+        if (!canCreate) throw new Error("No tienes permiso para crear áreas en este hotel.");
+    }
+
     if (!hotelIdToAssign) throw new Error("Se requiere un Hotel para crear el área.");
 
     const dept = await prisma.department.findFirst({ 

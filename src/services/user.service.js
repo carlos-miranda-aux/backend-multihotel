@@ -1,11 +1,28 @@
 import prisma from "../../src/PrismaClient.js";
 import ExcelJS from "exceljs";
 import * as auditService from "./audit.service.js"; 
+import { ROLES } from "../config/constants.js"; // 👈 IMPORTANTE
 
+// --- CORRECCIÓN DE SEGURIDAD MULTI-TENANT ---
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; 
-  return { hotelId: user.hotelId }; 
+  if (!user) return { hotelId: -1 };
+
+  if (user.hotelId) {
+    return { hotelId: user.hotelId };
+  }
+
+  if (user.rol === ROLES.ROOT || user.rol === ROLES.CORP_VIEWER) {
+    return {};
+  }
+
+  if (user.hotels && user.hotels.length > 0) {
+    const allowedIds = user.hotels.map(h => h.id);
+    return { hotelId: { in: allowedIds } };
+  }
+
+  return { hotelId: -1 };
 };
+// ----------------------------------------------------
 
 export const getUsers = async ({ skip, take, search, sortBy, order }, user) => {
   const tenantFilter = getTenantFilter(user);
@@ -167,20 +184,16 @@ export const deleteUser = async (id, user) => {
   return deleted;
 };
 
-// --- NORMALIZACIÓN ROBUSTA (Igual que en DeviceService) ---
 const clean = (txt) => txt ? txt.toString().trim() : "";
-// Normaliza: minúsculas, sin acentos (NFD) y sin diacríticos especiales
 const cleanLower = (txt) => {
     if (!txt) return "";
     return txt.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 };
 
 const extractRowData = (row, headerMap) => {
-  // Función auxiliar flexible para extraer datos de columnas con múltiples posibles nombres
   const getVal = (possibleKeys) => {
     const keys = Array.isArray(possibleKeys) ? possibleKeys : [possibleKeys];
     for (const key of keys) {
-        // Busca la clave normalizada en el mapa de cabeceras
         const idx = headerMap[cleanLower(key)];
         if (idx) return row.getCell(idx).text?.trim();
     }
@@ -209,13 +222,10 @@ const extractRowData = (row, headerMap) => {
 const resolveArea = (data, context) => {
   let areaId = null;
   if (data.areaNombre && data.deptoNombre) {
-    // Compara usando claves normalizadas (ej: "recepcion|division cuartos")
     const key = `${cleanLower(data.areaNombre)}|${cleanLower(data.deptoNombre)}`;
     areaId = context.areaMap.get(key);
 
     if (!areaId) {
-      // Intento de recuperación flexible: Buscar solo por nombre de área normalizado
-      // Esto ayuda si el departamento en el Excel tiene un nombre ligeramente diferente al de la BD
       const areasFound = context.areasList.filter(a => cleanLower(a.nombre) === cleanLower(data.areaNombre));
       if (areasFound.length === 1) areaId = areasFound[0].id;
     }
@@ -223,34 +233,44 @@ const resolveArea = (data, context) => {
   return areaId;
 };
 
-export const importUsersFromExcel = async (buffer, user) => {
-  if (!user.hotels || user.hotels.length !== 1) {
-      throw new Error("Acceso denegado: Solo administradores de una única propiedad pueden realizar importaciones masivas.");
-  }
+export const importUsersFromExcel = async (buffer, user, targetHotelId = null) => {
+  let hotelIdToImport = null;
 
-  const hotelIdToImport = user.hotels[0].id;
+  if (targetHotelId) {
+      if (user.rol === ROLES.ROOT) {
+          hotelIdToImport = targetHotelId;
+      } else {
+          const hasAccess = user.hotels && user.hotels.some(h => h.id === targetHotelId);
+          if (hasAccess) {
+              hotelIdToImport = targetHotelId;
+          } else {
+              throw new Error("Acceso denegado: No tienes permiso para importar en este hotel.");
+          }
+      }
+  } else {
+      if (user.hotels && user.hotels.length === 1) {
+          hotelIdToImport = user.hotels[0].id;
+      } else {
+           throw new Error("Se requiere especificar el Hotel para la importación.");
+      }
+  }
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
-  // --- 1. LEER Y NORMALIZAR ENCABEZADOS ---
   const headerMap = {};
   worksheet.getRow(1).eachCell((cell, colNumber) => {
-    // Almacena la cabecera normalizada para búsquedas insensibles a acentos
     headerMap[cleanLower(cell.value)] = colNumber;
   });
 
-  // --- 2. VALIDAR COLUMNAS ---
   const validNameHeaders = ['nombre', 'nombre completo', 'empleado'];
-  // Verificamos si existe alguna de las cabeceras válidas normalizadas
   const hasName = validNameHeaders.some(h => headerMap[cleanLower(h)]);
 
   if (!hasName) {
       throw new Error("El archivo no es válido: Falta la columna 'Nombre' en el encabezado.");
   }
 
-  // Verificación secundaria para asegurar contexto
   const secondaryColumns = ['correo', 'email', 'área', 'area', 'departamento', 'usuario', 'login']; 
   const hasSecondaryData = secondaryColumns.some(col => headerMap[cleanLower(col)]);
   
@@ -261,7 +281,6 @@ export const importUsersFromExcel = async (buffer, user) => {
   const usersToCreate = [];
   const errors = [];
 
-  // Obtenemos áreas de la BD para hacer el cruce
   const areas = await prisma.area.findMany({
     where: { 
         deletedAt: null,
@@ -270,9 +289,7 @@ export const importUsersFromExcel = async (buffer, user) => {
     include: { departamento: true }
   });
 
-  // Contexto con claves normalizadas (sin acentos)
   const context = {
-    // Mapa: "area|departamento" -> ID
     areaMap: new Map(areas.map(a => [`${cleanLower(a.nombre)}|${cleanLower(a.departamento?.nombre)}`, a.id])),
     areasList: areas
   };
@@ -282,7 +299,6 @@ export const importUsersFromExcel = async (buffer, user) => {
 
     const rowData = extractRowData(row, headerMap);
 
-    // Si no tiene nombre, ignoramos la fila (puede ser fila vacía al final del excel)
     if (!rowData.nombre) return; 
 
     const areaId = resolveArea(rowData, context);
@@ -305,7 +321,6 @@ export const importUsersFromExcel = async (buffer, user) => {
 
   for (const u of usersToCreate) {
     try {
-      // Buscamos si el usuario ya existe por nombre exacto en este hotel
       const existing = await prisma.user.findFirst({ 
           where: { 
               nombre: u.nombre,
