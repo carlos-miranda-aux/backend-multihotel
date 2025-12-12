@@ -46,8 +46,10 @@ app.use(compression());
 // 4. Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 300, // Límite de peticiones por IP
-  message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde."
+  max: 5000, // Límite de peticiones por IP
+  message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde.",
+  standardHeaders: true, // Informa el límite en las cabeceras `RateLimit-*`
+  legacyHeaders: false, // Deshabilita las cabeceras `X-RateLimit-*`
 });
 app.use(limiter);
 
