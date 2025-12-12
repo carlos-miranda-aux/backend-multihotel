@@ -1,52 +1,36 @@
 import prisma from "../PrismaClient.js";
 import bcrypt from "bcryptjs";
 import { DEVICE_STATUS, ROLES } from "../config/constants.js";
+import dotenv from "dotenv";
 
-const HOTELS_LIST = [
-    { 
-        nombre: "Crown Paradise Cancún", 
-        codigo: "CPC-CUN", 
-        direccion: "Blvd. Kukulcan Km 18.5, Zona Hotelera", 
-        ciudad: "Cancún, Quintana Roo",
-        razonSocial: "HOTELERA CANCO S.A. DE C.V.",
-        diminutivo: "CANCO"
-    },
-    { 
-        nombre: "Sensira", 
-        codigo: "CPC-SEN", 
-        direccion: "Carretera Cancún-Tulum Km 27.5", 
-        ciudad: "Puerto Morelos, Quintana Roo",
-        razonSocial: "OPERADORA SENSIRA S.A. DE C.V.", 
-        diminutivo: "SENSIRA"
-    },
-];
-
+// 1. CATÁLOGOS GLOBALES (No dependen de ningún hotel)
 const CATALOGS = {
-    types: ["Laptop", "Estación", "Servidor", "AIO", "Impresora", "Tablet", "Celular", "Cámara"], 
+    types: ["Laptop", "Estación", "Servidor", "AIO", "Impresora", "Tablet", "Celular", "Cámara"],
     os: ["Windows 11", "Windows 10", "Windows 7", "Windows Server 2019", "Windows Server 2016", "Android", "iOS", "MacOS"],
-    statuses: Object.values(DEVICE_STATUS) 
+    statuses: Object.values(DEVICE_STATUS)
 };
 
-const STANDARD_STRUCTURE = [
-    { 
-        depto: "Gerencia General", 
-        areas: ["Gerencia General", "General"] 
+// 2. PLANTILLA DE ESTRUCTURA
+export const STANDARD_STRUCTURE_TEMPLATE = [
+    {
+        depto: "Gerencia General",
+        areas: ["Gerencia General", "General"]
     },
-    { 
-        depto: "Capital Humano", 
-        areas: ["Capital Humano"] 
+    {
+        depto: "Capital Humano",
+        areas: ["Capital Humano"]
     },
-    { 
-        depto: "Contraloría", 
-        areas: ["Contabilidad", "Compras", "Almacén", "Costos", "Sistemas", "Contraloria", "Ingresos","Calidad"] 
+    {
+        depto: "Contraloría",
+        areas: ["Contabilidad", "Compras", "Almacén", "Costos", "Sistemas", "Contraloria", "Ingresos", "Calidad", "Ingresos"]
     },
-    { 
-        depto: "División Cuartos", 
-        areas: ["Recepción", "Ama de Llaves", "Seguridad", "Teléfonos", "Concierge", "Áreas Públicas", "División Cuartos", "Lavandería"] 
+    {
+        depto: "División Cuartos",
+        areas: ["Recepción", "Ama de Llaves", "Seguridad", "Teléfonos", "Concierge", "Áreas Públicas", "División Cuartos", "Lavandería"]
     },
-    { 
-        depto: "Mantenimiento", 
-        areas: ["Mantenimiento"] 
+    {
+        depto: "Mantenimiento",
+        areas: ["Mantenimiento"]
     },
     {
         depto: "Alimentos y Bebidas",
@@ -61,10 +45,6 @@ const STANDARD_STRUCTURE = [
         areas: ["Ventas", "Reservaciones"]
     },
     {
-        depto: "Golden Shores",
-        areas: ["Golden Shores"]
-    },
-    {
         depto: "Spa",
         areas: ["Spa"]
     },
@@ -75,87 +55,49 @@ const STANDARD_STRUCTURE = [
 ];
 
 export const preloadMasterData = async () => {
-
     try {
-        
+        // --- CARGA DE CATÁLOGOS GLOBALES ---
+        // Usamos upsert para no duplicar si ya existen
         await Promise.all([
             ...CATALOGS.types.map(nombre => prisma.deviceType.upsert({ where: { nombre }, update: {}, create: { nombre } })),
             ...CATALOGS.os.map(nombre => prisma.operatingSystem.upsert({ where: { nombre }, update: {}, create: { nombre } })),
             ...CATALOGS.statuses.map(nombre => prisma.deviceStatus.upsert({ where: { nombre }, update: {}, create: { nombre } }))
         ]);
 
-        for (const hotelData of HOTELS_LIST) {
-            const hotel = await prisma.hotel.upsert({
-                where: { codigo: hotelData.codigo },
-                update: { 
-                    direccion: hotelData.direccion,
-                    ciudad: hotelData.ciudad,
-                    razonSocial: hotelData.razonSocial,
-                    diminutivo: hotelData.diminutivo
-                },
-                create: { ...hotelData, activo: true }
-            });
-
-            for (const group of STANDARD_STRUCTURE) {
-                const depto = await prisma.department.upsert({
-                    where: { 
-                        nombre_hotelId: { nombre: group.depto, hotelId: hotel.id } 
-                    },
-                    update: {},
-                    create: { nombre: group.depto, hotelId: hotel.id }
-                });
-
-                for (const areaName of group.areas) {
-                    await prisma.area.upsert({
-                        where: {
-                            nombre_departamentoId_hotelId: { 
-                                nombre: areaName, 
-                                departamentoId: depto.id, 
-                                hotelId: hotel.id 
-                            }
-                        },
-                        update: {},
-                        create: {
-                            nombre: areaName,
-                            departamentoId: depto.id,
-                            hotelId: hotel.id
-                        }
-                    });
-                }
-            }
-        }
-        
-        // --- Usuario ROOT Original ---
+        // --- USUARIO ROOT (Super Admin) ---
+        // Este es el único usuario que necesita existir sí o sí para empezar
         const rootUser = await prisma.userSistema.findUnique({ where: { username: "root" } });
         if (!rootUser) {
-            const hashedPassword = await bcrypt.hash("MewtwoXY", 10);
+            // En producción, idealmente esta contraseña vendría de una variable de entorno
+            const hashedPassword = await bcrypt.hash(process.env.ROOT_PASS, 10);
+            
             await prisma.userSistema.create({
                 data: {
                     username: "root",
-                    email: "admin@simet.com",
+                    email: "root@simet.com",
                     password: hashedPassword,
-                    nombre: "Root",
-                    rol: ROLES.ROOT,
+                    nombre: "Super Admin",
+                    rol: ROLES.ROOT, // Acceso total
                 }
             });
-        } 
+        }
 
-        // Usuario SOPORTE (Global)
+        // --- USUARIO SOPORTE (Opcional, para emergencias globales) ---
         const supportUser = await prisma.userSistema.findUnique({ where: { username: "soporte" } });
         if (!supportUser) {
-            const hashedPasswordSupport = await bcrypt.hash("Arrvia.25", 10);
+            const hashedPasswordSupport = await bcrypt.hash(process.env.SOPORTE_PASS, 10);
             await prisma.userSistema.create({
                 data: {
                     username: "soporte",
                     email: "soporte@simet.com",
                     password: hashedPasswordSupport,
                     nombre: "Soporte",
-                    rol: ROLES.ROOT, // Se asigna ROOT para que tenga permisos de edición global
+                    rol: ROLES.ROOT, // Se asigna ROOT para dar mantenimiento global
                 }
             });
         }
-        
+
     } catch (error) {
-        console.error(error);
+        console.error("Error en preloadMasterData:", error);
     }
 };

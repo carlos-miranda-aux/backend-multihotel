@@ -92,7 +92,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT
 
 app.listen(PORT, async () => {
-  
+
   try {
     await prisma.$connect();
     // Carga datos iniciales si la BD está vacía
@@ -134,7 +134,6 @@ app.listen(PORT, async () => {
       });
 
       if (maintenances.length > 0) {
-        console.log(`Se encontraron ${maintenances.length} mantenimientos proximos. Enviando correos...`);
         for (const maint of maintenances) {
             const device = maint.device;
             if (!device || !device.areaId) continue;
