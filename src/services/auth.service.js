@@ -6,7 +6,28 @@ import * as auditService from "./audit.service.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// --- FUNCIÓN DE VALIDACIÓN DE REGLAS DE NEGOCIO ---
+const validateRoleAndHotels = (rol, hotelIds) => {
+  const isGlobalRole = [ROLES.ROOT, ROLES.CORP_VIEWER].includes(rol);
+  const hasHotels = hotelIds && Array.isArray(hotelIds) && hotelIds.length > 0;
+
+  // Regla 1: Globales NO pueden tener hoteles específicos (ven todo o nada, según la lógica de tenant)
+  // Nota: En tu sistema, ROOT ve todo por defecto. Asignarle hoteles específicos es redundante y confuso.
+  if (isGlobalRole && hasHotels) {
+      throw new Error("Los usuarios Globales (Root/Auditor) NO deben tener hoteles asignados. Su acceso es global por defecto.");
+  }
+
+  // Regla 2: Locales DEBEN tener al menos un hotel
+  if (!isGlobalRole && !hasHotels) {
+      throw new Error("Los usuarios Locales (Admin/Aux/Invitado) deben tener al menos un hotel asignado.");
+  }
+};
+
 export const registerUser = async (data, adminUser) => {
+  // 1. Validar consistencia Rol vs Hoteles
+  const assignedRol = data.rol || ROLES.HOTEL_GUEST;
+  validateRoleAndHotels(assignedRol, data.hotelIds);
+
   const hashedPassword = await bcrypt.hash(data.password, 10);
   
   let hotelsToConnect = [];
@@ -19,7 +40,7 @@ export const registerUser = async (data, adminUser) => {
       username: data.username,
       password: hashedPassword,
       nombre: data.nombre,
-      rol: data.rol || ROLES.HOTEL_GUEST,
+      rol: assignedRol,
       email: data.email,
       hotels: {
           connect: hotelsToConnect
@@ -94,11 +115,11 @@ export const loginUser = async ({ identifier, password }) => {
 export const getUsers = async ({ skip, take, sortBy, order }, adminUser) => {
   const whereClause = { deletedAt: null }; 
   
+  // Filtro de seguridad para ver usuarios
   if (adminUser.hotelId) {
       whereClause.hotels = { some: { id: adminUser.hotelId } };
   } 
-
-  else if (adminUser.rol !== ROLES.ROOT && adminUser.hotels && adminUser.hotels.length > 0) {
+  else if (adminUser.rol !== ROLES.ROOT && adminUser.rol !== ROLES.CORP_VIEWER && adminUser.hotels && adminUser.hotels.length > 0) {
       const myHotelIds = adminUser.hotels.map(h => h.id);
       whereClause.hotels = { some: { id: { in: myHotelIds } } };
   }
@@ -161,6 +182,22 @@ export const updateUser = async (id, data, adminUser) => {
   });
 
   if (!oldUser) throw new Error("Usuario no encontrado.");
+
+  // --- VALIDACIÓN AL ACTUALIZAR ---
+  // Determinamos cuál será el rol final y los hoteles finales para validar
+  const targetRole = rol || oldUser.rol;
+  
+  // Si nos envían hotelIds, usamos esos. Si no, usamos los que ya tenía el usuario.
+  let targetHotelIds = [];
+  if (hotelIds !== undefined) {
+      targetHotelIds = hotelIds; // Puede ser un array vacío si se están quitando todos
+  } else {
+      targetHotelIds = oldUser.hotels.map(h => h.id);
+  }
+
+  // Validar reglas antes de intentar actualizar
+  validateRoleAndHotels(targetRole, targetHotelIds);
+  // --------------------------------
 
   const updateData = {};
   if (nombre) updateData.nombre = nombre;

@@ -1,10 +1,31 @@
 import prisma from "../../src/PrismaClient.js";
 import * as auditService from "./audit.service.js"; 
+import { ROLES } from "../config/constants.js"; // 👈 IMPORTANTE
 
+// --- CORRECCIÓN DE SEGURIDAD MULTI-TENANT ---
 const getTenantFilter = (user) => {
-  if (!user || !user.hotelId) return {}; 
-  return { hotelId: user.hotelId };
+  if (!user) return { hotelId: -1 }; // Bloqueo total si no hay usuario
+
+  // 1. Contexto específico (Hotel seleccionado en el frontend)
+  if (user.hotelId) {
+    return { hotelId: user.hotelId };
+  }
+
+  // 2. Roles Globales (Ven todo)
+  if (user.rol === ROLES.ROOT || user.rol === ROLES.CORP_VIEWER) {
+    return {};
+  }
+
+  // 3. Usuarios con múltiples hoteles (Ven solo sus asignados)
+  if (user.hotels && user.hotels.length > 0) {
+    const allowedIds = user.hotels.map(h => h.id);
+    return { hotelId: { in: allowedIds } };
+  }
+
+  // 4. Fallback seguro (No ve nada)
+  return { hotelId: -1 };
 };
+// ----------------------------------------------------
 
 export const getMaintenances = async ({ skip, take, where, sortBy, order }, user) => {
   const tenantFilter = getTenantFilter(user);
@@ -12,7 +33,7 @@ export const getMaintenances = async ({ skip, take, where, sortBy, order }, user
   const finalWhere = {
     ...where,
     deletedAt: null,
-    ...tenantFilter
+    ...tenantFilter // 👈 Aplicamos el filtro seguro
   };
 
   let orderBy = { fecha_programada: 'desc' };
@@ -55,7 +76,7 @@ export const getMaintenanceById = (id, user) => {
     where: {
       id: Number(id),
       deletedAt: null,
-      ...tenantFilter
+      ...tenantFilter // 👈 Seguridad aquí también
     },
     include: {
       device: {
@@ -73,13 +94,22 @@ export const getMaintenanceById = (id, user) => {
   });
 };
 
+// ... (El resto de funciones create, update, delete se mantienen igual, ya usan las validaciones)
 export const createMaintenance = async (data, user) => {
-
   const device = await prisma.device.findUnique({ where: { id: Number(data.deviceId) } });
   if (!device) throw new Error("Dispositivo no encontrado.");
 
+  // Validación de seguridad cruzada
   if (user.hotelId && device.hotelId !== user.hotelId) {
-      throw new Error("No puedes programar mantenimiento para un equipo que no pertenece a tu hotel.");
+      throw new Error("No puedes programar mantenimiento para un equipo que no pertenece a tu hotel activo.");
+  }
+  
+  // Validación para vista global limitada
+  if (!user.hotelId && user.hotels && user.hotels.length > 0) {
+      const hasAccess = user.hotels.some(h => h.id === device.hotelId);
+      if (!hasAccess && user.rol !== ROLES.ROOT) {
+          throw new Error("No tienes permisos sobre el hotel al que pertenece este equipo.");
+      }
   }
 
   const newManto = await prisma.maintenance.create({ 
@@ -89,7 +119,6 @@ export const createMaintenance = async (data, user) => {
       } 
   });
 
-  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'CREATE',
     entity: 'Maintenance',
@@ -119,7 +148,6 @@ export const updateMaintenance = async (id, data, user) => {
     details = "Mantenimiento COMPLETADO";
   }
 
-  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'UPDATE',
     entity: 'Maintenance',
@@ -145,7 +173,6 @@ export const deleteMaintenance = async (id, user) => {
     data: { deletedAt: new Date() }
   });
 
-  // REGISTRAR AUDITORÍA
   await auditService.logActivity({
     action: 'DELETE',
     entity: 'Maintenance',
