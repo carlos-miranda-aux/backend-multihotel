@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { ROLES } from "../config/constants.js";
 import * as auditService from "./audit.service.js"; 
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecreto";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const registerUser = async (data, adminUser) => {
   const hashedPassword = await bcrypt.hash(data.password, 10);

@@ -92,8 +92,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT
 
 app.listen(PORT, async () => {
-  console.log(`Servidor seguro corriendo en el puerto ${PORT}`);
-
+  
   try {
     await prisma.$connect();
     // Carga datos iniciales si la BD está vacía
