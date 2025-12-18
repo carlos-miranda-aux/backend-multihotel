@@ -2,7 +2,6 @@ import prisma from "../PrismaClient.js";
 import * as hotelService from "../services/hotel.service.js";
 import { ROLES } from "../config/constants.js";
 
-// --- Métodos existentes ---
 export const getAvailableHotels = async (req, res, next) => {
   try {
     const user = req.user;
@@ -22,13 +21,18 @@ export const getAvailableHotels = async (req, res, next) => {
   }
 };
 
-// --- Nuevos métodos CRUD para ROOT ---
-
 export const getAllHotelsAdmin = async (req, res, next) => {
     try {
-        const hotels = await hotelService.getAllHotels();
-        res.json(hotels);
-    } catch (error) { next(error); }
+        const allHotelsInDb = await prisma.hotel.findMany({
+            orderBy: { nombre: 'asc' }
+        });
+        const filteredHotels = allHotelsInDb.filter(h => h.deletedAt === null);
+
+        res.json(filteredHotels);
+    } catch (error) { 
+        console.error("Error en getAllHotelsAdmin:", error);
+        next(error); 
+    }
 };
 
 export const createHotel = async (req, res, next) => {

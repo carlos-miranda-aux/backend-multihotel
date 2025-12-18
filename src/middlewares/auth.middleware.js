@@ -16,12 +16,8 @@ export const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(bearerToken, JWT_SECRET);
     
     const user = await prisma.userSistema.findUnique({
-        where: { id: decoded.id },
-        include: { 
-            hotels: { 
-                select: { id: true, nombre: true, codigo: true } 
-            } 
-        }
+    where: { id: decoded.id },
+    include: { hotels: true }
     });
 
     if (!user) {

@@ -3,7 +3,6 @@ import * as auditService from "./audit.service.js";
 import { STANDARD_STRUCTURE_TEMPLATE } from "../utils/preloadData.js";
 import { ROLES } from "../config/constants.js";
 
-// Filtro especial para la entidad Hotel (filtra por ID, no por hotelId)
 const getHotelFilter = (user) => {
     if (!user) return { id: -1 }; 
 
@@ -27,17 +26,12 @@ export const getAllHotels = async (user) => {
         deletedAt: null,
         ...filter
     },
-    select: { 
-        id: true, nombre: true, codigo: true, direccion: true, 
-        ciudad: true, razonSocial: true, diminutivo: true, 
-        activo: true 
-    },
     orderBy: { nombre: 'asc' }
   });
 };
 
 export const createHotel = async (data, user) => {
-  // 1. Crear el Hotel base
+
   const newHotel = await prisma.hotel.create({
     data: {
       nombre: data.nombre,
@@ -50,9 +44,7 @@ export const createHotel = async (data, user) => {
     }
   });
 
-  // 2. Generar Estructura Automática
   if (data.autoStructure) {
-      
       for (const group of STANDARD_STRUCTURE_TEMPLATE) {
           const depto = await prisma.department.upsert({
               where: { 
@@ -149,4 +141,4 @@ export const deleteHotel = async (id, user) => {
   });
 
   return deleted;
-};
+};  
