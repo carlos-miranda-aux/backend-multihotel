@@ -33,7 +33,7 @@ dotenv.config();
 const app = express();
 
 // --- CONFIGURACIÓN DE SEGURIDAD Y MIDDLEWARES ---
-
+app.set('trust proxy', 1)
 // 1. Logs de peticiones
 app.use(morgan("combined")); 
 
@@ -103,7 +103,8 @@ app.listen(PORT, async () => {
   }
 
   // --- CRON JOBS ---
-  cron.schedule('0 9 * * *', async () => {
+  cron.schedule('* * * * *', async () => {
+ // cron.schedule('0 9 * * *', async () => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);

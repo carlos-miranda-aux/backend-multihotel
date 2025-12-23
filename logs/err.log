@@ -1,0 +1,595 @@
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 12)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 2)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 2)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 1)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 4)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 14)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 12)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR 08004 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 9)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR 08004 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 4)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR 08004 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 12)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR 08004 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 14)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error al iniciar DB: PrismaClientInitializationError: Too many database connections opened: ERROR 08004 (1040): Too many connections
+    at r (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:112:2770)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:98:5) {
+  clientVersion: '6.15.0',
+  errorCode: 'P2037',
+  retryable: undefined
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 12)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 9)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 3)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 2)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 2)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 4)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 9)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.operatingSystem.upsert()` invocation:
+
+
+Too many database connections opened: ERROR 08004 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 14)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'OperatingSystem',
+    message: 'ERROR 08004 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:43:08: Error en preloadMasterData: PrismaClientKnownRequestError: 
+Invalid `prisma.deviceType.upsert()` invocation:
+
+
+Too many database connections opened: ERROR HY000 (1040): Too many connections
+Prisma Accelerate has built-in connection pooling to prevent such errors: https://pris.ly/client/error-accelerate
+    at ei.handleRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:7283)
+    at ei.handleAndLogRequestError (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6608)
+    at ei.request (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:121:6315)
+    at async a (C:\Simet\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
+    at async Promise.all (index 4)
+    at async preloadMasterData (file:///C:/Simet/backend/src/utils/preloadData.js:64:9)
+    at async Server.<anonymous> (file:///C:/Simet/backend/src/index.js:100:5) {
+  code: 'P2037',
+  meta: {
+    modelName: 'DeviceType',
+    message: 'ERROR HY000 (1040): Too many connections'
+  },
+  clientVersion: '6.15.0'
+}
+2025-12-23 10:55:41: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 10:56:15: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 11:02:35: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 11:05:00: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 11:43:32: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 11:43:32: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 12:35:11: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 12:36:21: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 12:47:53: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 12:48:46: ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+    at Object.xForwardedForHeader (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:337:13)
+    at wrappedValidations.<computed> [as xForwardedForHeader] (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:651:22)
+    at Object.keyGenerator (file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:754:20)
+    at file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:815:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Simet/backend/node_modules/express-rate-limit/dist/index.mjs:796:5 {
+  code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+  help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+}
+2025-12-23 12:49:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:49:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:49:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:49:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:50:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:50:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:50:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:50:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:51:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:51:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:51:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:51:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:52:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:52:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:52:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:52:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:53:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:53:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:53:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:53:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:54:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:54:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:54:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:54:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:55:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:56:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:57:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:58:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 12:59:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:00:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:01:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
+2025-12-23 13:02:00: Error al enviar correo de RECORDATORIO a rocampo@crownparadise.com: ESOCKET
