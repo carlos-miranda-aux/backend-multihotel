@@ -69,7 +69,7 @@ export const preloadMasterData = async () => {
 
         // --- USUARIO ROOT (Super Admin) ---
         // Este es el único usuario que necesita existir sí o sí para empezar
-        const rootUser = await prisma.userSistema.findUnique({ where: { username: "root" } });
+        const rootUser = await prisma.userSistema.findUnique({ where: { username: "superuser" } });
         if (!rootUser) {
             const hashedPassword = await bcrypt.hash(process.env.ROOT_PASS, 10);
             

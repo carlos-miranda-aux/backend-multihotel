@@ -2,12 +2,12 @@
   "name": "backend_v2",
   "version": "2.0.0",
   "type": "module",
-  "description": "",
+  "description": "Backend para el sistema Simet",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "npx prisma generate && npx prisma migrate deploy && node src/index.js"
   },
   "keywords": [],
   "author": "Carlos Miranda",
